@@ -1,0 +1,262 @@
+---
+title: "Assignment 2"
+author: "Trude Almestrand"
+date: "13 9 2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Assignment 2
+## Questions of the week
+
+### 1. Describe the advantages of RNA-Seq over microarrays. Include details about differences in accuracy in gene expression estimation and various analysis that is only possible using RNA-Seq.
+
+RNA-seq is a tool that allows generation of a staggering amount of data compared to microarrays. It is also more sensitive when it comes to the detection of genes with low expression rate. Microarrays require knowledge of novel transcripts in order to analyze expression rate, whereas RNA-seq does not. RNA-seq is therefore a great tool for discoveries of novel transcripts. When compared to microarrays RNA-seq has few background signal because it can be mapped to unique regions of the genome - it also does not have an upper limit for quantification unlike microarrays. For microarrays, if quantified expression reaches over a treshold level the color will not be detected by the computer and thus expression level cannot be correctly determined (low saturation). Whereas RNA-seq has high dynamic range (no saturation). RNA-seq also has a single base resolution vs microarrays' hundred or so, making RNA-seq a more accurate way to recreate RNAs. Another advantage of RNA-seq is that it can do more than just quantify gene expression, it can also detect SNPs, RNA editing and gene fusions as long as the sequencing depth (D) is large enough. 
+
+Source: 
+Wang, Z, Gerstein, M, Snyder, M, *RNA-Seq: a revolutionary tool for transcriptomics*, 2009, Yale University, USA, doi: 10.1038/nrg2484
+
+### 2. Many scaling methods (i.e. normalisation for library size in RNA-Seq data) assume that most genes are not differentially expressed. Why is this a necessary assumption for methods such as DESeq2 and edgeR/TMM?
+
+DESeq uses a scaling method that is based around the average lane read. If genes are differentially expressed then the mean would not be distributed symmetrically and our factor would not be representative for that gene. DeSeq assumes that reads from sample j that are assigned to gene i is modeled by a negative binomial distribution. Thus seeing as all genes fall under the same model; the assumption is a necessary basic model assumption. The article written by Anders and Huber states that experience with real data shows that (for a few) highly differentially expressed genes skews the data by influencing the total read count causing the previous ratio (just adjusting read depth to gene) not to be a good estimate for the ratio of expected counts. Therefore they adjust using the median of the ratio of observed count to minimize type I error. By assuming no genes are differentially expressed they can further test for differential expression using hypothesis testing.
+
+
+source: Anders S, Huber W (2010). “Differential expression analysis for sequence count data.” Genome Biology, 11, R106. doi: 10.1186/gb-2010-11-10-r106, http://genomebiology.com/2010/11/10/R106/.
+
+
+### 3. Explain the intuition behind the EM-algorithm for estimating gene expression from multi-mapping reads. What is the problem this algorithm is trying to solve and how does it solve it?
+
+The EM-algorithm tries to quantify the expression of genes by counting the reads of each transcript. A problem that we face is that we dont account for multi-mapping reads. This leads to an under-expression assumption of paralogs and splice variants (within the gene).
+By using the EM (expectation maximization) algorithm they try to map the multi-reads by assigning them probabilistically. The EM algorithm is an iterate algorithm that paces the data. The algorithm estimates the fraction of transcript (tau) that belongs to isoform (splice-variant/transcript variant) i. But it is easier to estimate the fraction of reads (theta) from isoform i instead.
+
+The algorithm bases a guess for the theta and estimates tau based on the current theta and the isoform length. It then gives a new value to theta by distributing the multi-reads from tau. The estimation of tau and assigning of new values is proceeded until the value for the thetas no longer change and we can assume the value for tau is correct. 
+
+
+source: Hvidsten, T.R, "BIN315 week 2 part c", 2020, https://www.youtube.com/watch?v=WwSaMucvFR4&feature=youtu.be 
+
+
+
+
+```{r}
+# load the beadarray package
+library(beadarray)
+
+# Read in the raw microarray data file from your working directory as bead summary data (bds)
+bsd <- readBeadSummaryData("GSE28521_non-normalized_data.txt.gz",
+                           sep="\t", ProbeID="PROBE_ID", skip=0,
+                           columns=list(exprs="AVG_Signal",
+                                        se.exprs="BEAD_STDERR",
+                                        nObservations="Avg_NBEADS",
+                                        Detection="Detection.Pval"))
+
+# metadata for samples (phenotype)
+pData.bsd <- pData(bsd)
+
+# metadata for probes (features)
+fData.bsd <- fData(bsd)
+```
+
+```{r}
+library(illuminaHumanv3.db)
+bsd <- addFeatureData(bsd, toAdd=c("SYMBOL"), annotation="Humanv3")
+
+# reload the feature data to see that it now contains gene symbols
+fData.bsd <- fData(bsd)
+```
+
+
+
+```{r}
+library(GEOquery)
+gse <- getGEO(filename="GSE28521_series_matrix.txt.gz")
+pData.gse <- pData(gse)
+```
+
+```{r}
+pData.gse <- pData.gse[match(pData.bsd$sampleID, pData.gse$description), ]
+
+match(pData.bsd$sampleID, pData.gse$description)
+
+name <- pData.gse$title
+
+condition <- pData.gse$characteristics_ch1
+
+condition <- sub("disease status: ", "", condition)
+
+tissue <- pData.gse$characteristics_ch1.1
+
+pData(bsd) <- cbind(pData(bsd), name, condition, tissue)
+
+```
+
+
+```{r}
+isCerebellum <- pData(bsd)$tissue == "Cerebellum"
+bsd.cerebellum <- bsd[, isCerebellum]
+bsd.cortex <- bsd[, !isCerebellum] # all that is not cerebellum is cortex (frontal or temporal)
+```
+
+```{r}
+# Get p-values
+detectPval <- Detection(bsd)
+
+# Check if they are less than 0.05
+isDetectable <- detectPval < 0.05
+
+# For each probe, count the number of samples that are detectable
+# We can do this by taking the sum for each row in the isDetectable matrix
+nDetectable <- rowSums(isDetectable)
+
+# How many samples do we have in the dataset?
+nSamples <- ncol(bsd)
+
+# Keep the probe if the number of detectable samples is 
+# greater than half the number of samples
+keepTheProbe <- nDetectable > (nSamples/2)
+
+# Lastly, extract the filtered subset of the dataset that we want to keep
+bsd.filt <- bsd[keepTheProbe, ]
+
+filterDetectable <- function(dataset){
+  # number of samples detectable per probe
+  nDetectable <- rowSums(Detection(dataset) < 0.05)
+  # keep if more than half of the samples are detectable
+  keepTheProbe <- nDetectable > (ncol(dataset)/2)
+  # return the filterred dataset
+  dataset[keepTheProbe, ]
+}
+
+bsd.cortex.filt <- filterDetectable(bsd.cortex)
+bsd.cerebellum.filt <- filterDetectable(bsd.cerebellum)
+
+
+# Genes removed after filtration:
+#For cortex:
+dim(bsd.cortex) - dim(bsd.cortex.filt)
+
+# For cerebellum:
+dim(bsd.cerebellum) - dim(bsd.cerebellum.filt)
+```
+# Normalization
+*Create a boxplot of the expression values in bsd.filt, similar to the plot below (use boxplot and outline=FALSE to hide outlier points). Find out how you rotate the x-axis labels and reduce the font size. Google is your friend!*
+```{r}
+boxplot <- boxplot(exprs(bsd.filt),
+  outline=FALSE, 
+  ylim = c(0, 8000), las=2, cex.axis=0.5)
+
+```
+In a boxplot you plot the lowest part of the enclosed rectangle as the median of the first quadrant and the top is the median of the third quadrant of the data plotted. The whiskers (or lines above and under the boxplot) shows the minimum value from the data (beneath) and the maximum data (above). The median of the entire dataset is respresented in the box itself as a thick line.
+
+```{r}
+log2_transformed_bsd <- log2(exprs(bsd.filt))
+log2_boxplot <- boxplot(log2_transformed_bsd, outline=FALSE, las=2, cex.axis=0.6)
+```
+*How do you read log-tranformed values? What does an increase from 10 to 11 on the log-scale mean on the original (linear) scale?*
+The log transformed values can be read: that by an increase of 1, the y value doubles. 
+
+*What is the main difference after log-transformation compared to before (based on the box-plot)?*
+The boxplot is easier to read compared to before.
+The main effect on log transformation is that the density between boxes are more widely spread out, making it easier to see differences from a graphical point of view. 
+
+
+*What type of normalization did Voineagu et al. use? (See microarry data analysis section of methods)*
+
+Voineagu et al. used log2 on the raw data and was normalized by quantile normalization.
+
+```{r}
+# Example to normalize bsd.filt
+# Fill in missing parameters
+# See help of normaliseIllumina() for options
+bsd.norm <- normaliseIllumina(bsd.filt, method="quantile", transform="log2")
+
+boxplot(exprs(bsd.norm), outline= FALSE, las=2, cex.axis = 0.6)
+```
+Perform the same kind of normalization as they did on bsd, and make sure you get log2-transformed expression values as a result.
+You’ll notice in the paper that they did normalization of different parts of the dataset (bsd.cortex and bsd.cerebellum). Do the same.
+
+bsd.cerebellum.norm <- normaliseIllumina(bsd.cerebellum.filt, method = "quantile", transform = "log2")
+boxplot(exprs(bsd.cerebellum.norm), outline= FALSE, las=2, cex.axis=0.6)
+
+Cerebellum has no differentially expressed genes according to dim(bsd.cerebellum), thus we cannot normalize data, as it does not exist. (in the report they stated 2 DE genes in cerebellum, don't know why it does not work here)
+
+```{r}
+bsd.cortex.norm <- normaliseIllumina(bsd.cortex.filt, method = "quantile", transform = "log2")
+boxplot(exprs(bsd.cortex.norm), outline= FALSE, las=2, cex.axis=0.6)
+```
+The normalization method appears to have corrected the data of all genes making them equal (no differently expressed genes). Prerequisite for DEseq or EdgeR/TMM analysis. 
+
+```{r}
+library("DESeq2")
+# Get a list of file names under the htseq folders
+HTSeqFiles <- list.files("htseq")
+
+# Create a sample table using the file names
+sampleTable <- data.frame(
+  # Make sample names from file names, minus ".txt"
+  sample=sub(".txt", "", HTSeqFiles),
+  # Make file names
+  file=HTSeqFiles,
+  # Make sample conditions using the first letter of the file names
+  # If it starts with "A" it's autism, else it's control
+  condition=factor(ifelse(grepl("^A", HTSeqFiles), "autism", "control"), levels=c("control", "autism"))
+)
+
+dds <- DESeqDataSetFromHTSeqCount(sampleTable, "htseq", ~ condition)
+
+boxplot(log2(counts(dds)), outlier= FALSE, las=2, cex.axis=0.6)
+```
+*A simple, but important, normalization step is to account for library sizes. Imagine that we could sequence the exact same sample twice, but at different sequencing depths. In this case the genes in both samples would be expressed at the same levels (obviously, it is the same sample!), but what would the RNA-Seq data show you? Explain.*
+The RNA-seq data would show a difference in expression because the depth of the second sample is sequenced more often.Thus by comparing the raw data it would show that the gene sequenced the second time around (with more depth) would be more expressed. Making the two datasets non-compareable and giving rise to more variation.
+
+```{r}
+dds <- estimateSizeFactors(dds)
+boxplot(log2(counts(dds, normalized=TRUE)), outlier=FALSE, las=2, cex.axis=0.6)
+```
+
+
+*Can you explain the difference between the boxplots before and after normalization using the values of the normalization factors?* 
+```{r}
+sizeFactors(dds)
+```
+The size factors reflects the library size of each read. Meaning that the smaller the factor - the smaller the raw read count. The factor is computed as the median (of the reation) of a genes read count over its mean across all lanes. so: 
+median of all (gene read / mean lane read). Meaning that for the first boxplot (with a factor of 0.47) the gene read is around half of the overall mean lane read. This normalisation does in other words normalize the variance factor (removing a controllable error rate), but assumes that all genes are differentially expressed. 
+
+*Another method for normalizing is the variance stabilizing transformation (VST). The goal of VST is to make sure that the expression values are independent from their mean values. For example, let’s pretend that our expression values come from different Poisson distributions, i.e. Poisson distributions with different means. In the Poisson distribution, the variance is identical to the mean, so the variance varies with the mean:*
+
+```{r}
+x <- sapply(c(1:20), function(lambda) { rpois(100, lambda) })
+plot(NA, xlim=c(0, 20), ylim=c(0, max(x)), ylab="x", xlab="Poisson mean")
+for (i in c(1:20)) {
+  points(x[i,], pch=16, col=rgb(0, 0, 0, 0.3))
+}
+```
+*Notice how the x-values have higher variance (larger spread) for higher means.*
+
+*If we apply the simple transform y=√x(mean), the variance (spread on yaxis) will be almost constant across the different observations:*
+
+```{r}
+y <- sqrt(x)
+plot(NA, xlim=c(0, 20), ylim=c(0, max(y)), ylab="y", xlab="Poisson mean")
+for (i in c(1:20)) {
+  points(y[i,], pch=16, col=rgb(0, 0, 0, 0.3))
+}
+```
+
+In DESeq2 a more advanced transformation is implemented in the function: varianceStabilizingTransformation.
+
+*Apply the VST to the data and plot a boxplot of the resulting values. You can extract the expression values from the resulting object using the assay function. Explain what you see: What is different and why?*
+
+```{r}
+vsd <- varianceStabilizingTransformation(dds)
+boxplot(assay(vsd),las=2, outlier=FALSE, cex.axis=0.6)
+```
+The data is still normalized, but the maximum for each gene is has decreased. By applying the varianceStabilizingTransformation it removes the larger spread of the higher variance and makes variances almost constant across the different observations. Useful for statistical analysis where we assume constant variance (Homoscedasticity). 
+
+
+
+
+
+
