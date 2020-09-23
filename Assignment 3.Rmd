@@ -11,9 +11,14 @@ knitr::opts_chunk$set(echo = TRUE)
 # Assignment 3
 
 ##1. What is the general idea behind variance adjustment methods when testing for differential expression? Explain the method and why it is acceptable to use adjustment.
+The general idea is that with variance adjustment one attempts to estimate variance according to sample size. We usually transform data to stabilize response variables, making the response variable close to a normal distribution and fitting the model assumptions (which in Limma is a linear model) (Montgomery, 2017, p.656). A method that assumes independently sampled reads is the Poisson-model. Poisson assumes that the variance and the mean are alike, but does not account for dependability which usually arises in biological samples. Assuming that variance in genes are independent of eachother may be wrong (e.g the omnigenics model), and  throws away a lot of potential answers. If we have a small sample size it is difficult to precisely estimate the true variance for a certain gene and so it is sometimes necessary to estimate variance using similarily expressed genes or pseudodata. Negative binomial distribution assumes that genes have different mean and variance. Whether or not they are differentially expressed then depends on the significance level set by the analyzer. Usually when analyzing genes we have few replicates and would therefore require either more data or follow empirical bayes which borrows information across genes. This adjustment is acceptable because although some genes have higher variation than others, the variation in general should be the same for all genes (Hvidsten, 2020). Therefore we compute the average variance of all genes and adjust the variance of each gene to look more like the mean variance using a weight. We can thereafter test if there is a difference in variance using an adjusted t-test. 
 
+Sources: 
+Montgomery, D 2017, *Design and analysis of experiments*, 9th edition. Wiley, Hoboken, NJ
+Hvidsten, T.R, "BIN315 week 3 part 1", 2020, https://www.youtube.com/watch?v=RTDMHvmoDL4&feature=youtu.be   
 
 ##2. Describe the main differences between finding differentially expressed genes from microarray data and RNA-Seq data.
+
 
 ##3. What is (1) function enrichment analysis and (2) gene set enrichment analysis? Explain each method first and then discuss similarities and differences.
 
