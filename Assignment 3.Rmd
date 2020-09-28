@@ -18,10 +18,16 @@ Montgomery, D 2017, *Design and analysis of experiments*, 9th edition. Wiley, Ho
 Hvidsten, T.R, "BIN315 week 3 part 1", 2020, https://www.youtube.com/watch?v=RTDMHvmoDL4&feature=youtu.be   
 
 ## 2. Describe the main differences between finding differentially expressed genes from microarray data and RNA-Seq data.
-RNA-Seq data uses counts unlike microarray data which uses intensity-concentration. Microarray data is relative to the other samples in the array whereas RNA-Seq assumes a general mean for all genes. 
+RNA-Seq data uses counts unlike microarray data which uses intensity-concentration. Microarray data is probe based and the different concentrations are independent of each other, whereas RNA-Seq assumes a general mean for all genes. With RNA seq we try to estimate if there is a significant difference in read count. Microarray data on the other hand is inherently continuous while RNA-seq data is count-based. The counts in RNA seq is limited by the sequencing depth and is therefore dependent on comparison of other transcrips. Because of this a number of statistical tests has been implemented in order to find DEGs in RNA-Seq and they all vary in specificity and sensitivity (Rapaport et. al, 2013). Microarray data however is measured using match probes followed by a quantile normalization (a technique that makes two distribution identical statistically). However, with microarray you often run a statistical test many times to check for differences between samples which increases the odds of making a type-1-error (getting a false positive), so usually the p values are often adjusted to take the multiple testing into consideration. In RNA-seq a design matrix is necessary to compare samples this is to better label the tests. Like microarray DEGs are analyzed after normalization and p-tests, but as mentioned RNA-Seq is count based. You further also have to account for the FDR (false discovery rate, probability of doing a type I error). Genes are in RNA-seq meaningful if they pass a certain threshold in the log fold change. 
+
+Sources: 
+Hvidsten, T.R,*BIN315 week 3 part B*, 2020, https://www.youtube.com/watch?v=iaIHti7Tg3M&feature=youtu.be  
+Rapaport, F, Khanin, R, Liang, Y, Pirun, M, Krek, A, Zumbo, P, Mason, C, Socci, N, Betel, D. *Comprehensive evaluation of differential gene expression analysis methods for RNA-seq data*, 2013, Genome biology, 14:R95, http://genomebiology.com/2013/14/9/R95 
+
 ## 3. What is (1) function enrichment analysis and (2) gene set enrichment analysis? Explain each method first and then discuss similarities and differences.
+Function enrichment analysis is the test to see if the differentially expressed genes are enriched in the functional categories that may have an association with a given phenotype. You typically check if the gene you have found (given a p value threshold) can be connected physiologically to a given phenotype using known gene functions (for instance in blood coagulation). In gene set enrichment analysis you check if a set of genes tend to be at the top of a ranked list of differential expressed genes. In GSEA you calculate an enrichment score that represents which genes are over represented at the top or bottom of the list. You then estimate the statistical significance of the enrichment score. Afterwards you adjust for multiple hyptohesis testing and FDR. In FEA you only account for the DEGs below a significance value whereas in GSEA you only sort by DEG and check if the group of genes are represented at the top or bottom of the list. So for GSEA you only test if the difference between two cell categories are at the top or bottom of the list. Whereas for FEA you take the p value of DEGs into account.  
 
-
+Hvidsten, T.R,*BIN315 week 3 part B*, 2020, https://www.youtube.com/watch?v=iaIHti7Tg3M&feature=youtu.be  
 ## Computer lab
 ```{r}
 library(beadarray)
@@ -53,12 +59,14 @@ nrow(topTable(cortex.fit, coef = 2, number = Inf))
 ```
 
 12 353 probes have been tested
+
 *How many of the probes have an adjusted p-value < 0.05?*
 ```{r}
 nrow(topTable(cortex.fit, coef = 2, number = Inf, p.value = 0.05))
 ```
 
 2083 probes have an adjusted p-value less than 0.05
+
 *How many of the significant probes do you expect to be false positives?*
 2083 * 0.05 = 104 false positives.
 
@@ -85,7 +93,9 @@ res <- results(dds)
 
 
 ```
+
 *Some genes (e.g. ENSG00000000005) does not get an adjusted p-value (NA). This is because DESeq has decided that it cannot reliably compute significance for this gene due to low expression or outlier. Question: Why do you think some genes only have NA-values?*
+
 Because the difference in gene may be close to 0 or equal to each other
 ```{r}
 # Want to know how many DEG + sorted table
@@ -93,30 +103,38 @@ Because the difference in gene may be close to 0 or equal to each other
 res0.05 <- subset(res, padj < 0.05)
 res0.05[order(res0.05$padj),]
 ```
+
 *How many genes with expression were tested?*
 ```{r}
 nrow(dds)
 ```
 
 *What proportion of genes are DEGs?*
+
 ```{r}
 nrow(res0.05)/nrow(dds)
 ```
 8,6% of genes are DEGs
+
 *How many DEGs are up and how many are down in autism? Are there more genes increasing or decreasing in expression?*
+
 ```{r}
 sum(res0.05$log2FoldChange <= 0)
 
 sum(res0.05$log2FoldChange >= 0)
 ```
 860 DEGs downregulated vs 1000 upregulated. There are more genes increasing in expression
+
 *How many DEGs do we expect to be false positives given the FDR cutoff?*
+
 ```{r}
 nrow(res0.05) * 0.05
 ```
 Expect 93 false positives. 
 
-#MA plot for visual overview of the DE results
+
+# MA plot for visual overview of the DE results
+
 ```{r}
 plotMA(res, alpha = 0.05)
 ```
@@ -125,10 +143,11 @@ plotMA(res, alpha = 0.05)
 Because we haven't accounted for FDR yet. Meaning some values have a high p value and is still located above a certain level of significance.
 
 *Why are there so many genes with high log fold change that are not DEGs on the left hand side of the plot?*
-There are genes with a lower count number with such a high variety that they are not deemed significant. 
+There are genes with a lower count number with such a high variety (and p value) that they are not deemed significant.
+
 *Create a new table from res that contains significant DEGs (FDR < 0.05) with expression levels that are either double that of the control condition or half that of the control condition.*
 ```{r}
-library(dplyr)
+
 # Filtrerer først vekk NA
 
 # Lager deretter tabellen, deler opp i 2 da jeg slet med intervall
