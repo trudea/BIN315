@@ -1,0 +1,22 @@
+---
+title: "Assignment 4"
+author: "Trude Haug Almestrand"
+date: "29 9 2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Assignment 4
+
+### 1. What is the difference between using Euclidian distance and correlation in clustering analysis, and how does scaling affect these differences? Write approximately 250 words. 
+
+With euclidian distance you measure the shortest distance between the groups points' most close to each other. Whereas with correlation you measure to see if the variables you are analyzing are dependent of each other. For instance with pearson correlation you check linear dependence of each other. Seeing whether or not one group has an effect on the other group. 
+
+### 2. Case study: You are given a transcriptomics data set with measurement of gene expression (VST) in a number of individuals (genes x samples/individuals table). You are also given the results of several Chip-seq experiments that associate a number of transcription factors (TFs) with genes (TFs x genes table). You suspect that the individuals suffer from several different diseases possibly caused by mis-regulation of some of the same genes. You assume that the different diseases are caused by up-regulation of genes through up-regulation of TFs or mutations that recruit TFs to new promoters. You would like to find the subset of genes and TFs characteristic to each disease. How would you analyze the data? Explain how the chosen method works and how it would give the desired result. Write approximately 500 words. 
+
+
+## Computer lab
+
