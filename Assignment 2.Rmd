@@ -151,7 +151,7 @@ boxplot <- boxplot(exprs(bsd.filt),
 In a boxplot you plot the lowest part of the enclosed rectangle as the median of the first quadrant and the top is the median of the third quadrant of the data plotted. The whiskers (or lines above and under the boxplot) shows the minimum value from the data (beneath) and the maximum data (above). The median of the entire dataset is respresented in the box itself as a thick line.
 
 ```{r}
-log2_transformed_bsd <- log2(exprs(bsd.filt))
+log2_transformed_bsd <- log2(exprs(bsd.filt) + 1)
 log2_boxplot <- boxplot(log2_transformed_bsd, outline=FALSE, las=2, cex.axis=0.6)
 ```
 *How do you read log-tranformed values? What does an increase from 10 to 11 on the log-scale mean on the original (linear) scale?*
