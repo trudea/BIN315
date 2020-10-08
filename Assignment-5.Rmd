@@ -1,0 +1,21 @@
+---
+title: "Assignment 5"
+author: "Trude Almestrand"
+date: "7 10 2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Assignment 5
+## Questions of the week
+
+*1. A biologist has just read an article about machine learning, and decided to try it on his RNA-Seq data. Since he has many more genes than samples, he decided to do feature selection by choosing the most differentially expressed genes. He did feature selection first on the entire dataset and then validated his model using cross validation. To his dismay the analysis was heavily critiqued by the reviewers. They said he had to use an independent test set. The biologist doesn't understand the criticism and comes to you. Explain to him what he did wrong and why. Write approximately 250 words.*
+If he starts selecting DEGs one at a time he misses the feautre selection of eachother disregarding genes when compared to each other.
+He has overfitted his data by having too much selection in his training data. For training data you would have to assume a training set representative for data encountered in the future. By choosing to do a feature selection using only DEGs he does not take into account the non-DEGs (which are more common in nature). This leads to a wrong predictive model of what one can expect from any given dataset. When he then runs cross-validation after feature selection, he overfits the model. This leads to the model only being applicable for his dataset, and leads to new examples not being applicable to his dataset. What he should have done is using feature selection for each cross validation fold. 
+
+
+*2. Let's say you want to "read" the genetic code using machine learning. You figure you can use GWAS populations as training data with SNPs as features and traits as labels. Will this approach fly? Discuss using concepts such as omnigenics, curse of dimensionality, model complexity and overfitting. Write approximately 250 words. *
+SNPs in a given feature only works for monogenic traits. In order to read the genetic code for traits you would have to have a physical map of given traits and have already established if it is monogenic or polygenic. Seeing as we are trying to use GWAS populations as training data you would need 1000^SNPs observations (or GWAS populations). Here we have to many SNPs (features) compared to examples (training data). The curse of dimensionality is now that we will need millions of individuals to avoid overfitting. If we have a GWAS population an obvious feature selection would be to select significant SNPs. The problem with this is that we lose combinations of SNPs that may be important (omnigenic traits).       
