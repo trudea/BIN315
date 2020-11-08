@@ -1,0 +1,100 @@
+---
+title: "Project"
+author: "Trude Almestrand"
+date: "8 11 2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Project
+
+### Abstract
+### Introduction
+### Methods
+Supervised learning: 
+(a) PCA/hierarchal clustering/heatmap to get an initial overview of the data, 
+(b) differential expression analysis to reduce the dimensionality, 
+(c) machine learning to predict outcome, 
+(d) extract some biological insight from the machine learning model
+
+
+### Results
+### Discussion
+### References
+
+http://www.sthda.com/english/articles/37-model-selection-essentials-in-r/152-principal-component-and-partial-least-squares-regression-essentials/ 
+https://machinelearningmastery.com/feature-selection-with-real-and-categorical-data/ 
+https://www.r-bloggers.com/2014/05/evaluating-model-performance-a-practical-example-of-the-effects-of-overfitting-and-data-size-on-prediction/ 
+
+## Extra
+
+Including code
+```{r}
+if (!requireNamespace("BiocManager", quietly = TRUE))
+  install.packages("BiocManager")
+BiocManager::install("TCGAbiolinks")
+
+library(TCGAbiolinks)
+
+# View all projects
+# View(TCGAbiolinks:::getGDCprojects())
+
+expr <- data.frame()
+samples <- c()
+classes <- c()
+
+# Download RNA-Seq data for two selected projects
+tissue <- c("Skin", "Testis", "Ovaries", "Lung", "Prostate")
+proj   <- c("TCGA-BRCA", "TCGA-KIRC", "TCGA-COAD", "TCGA-LUAD", "TCGA-PRAD")
+for (i in 1:length(proj)) {
+
+  query <- GDCquery(project = proj[i],
+                    data.category = "Gene expression",
+                    data.type = "Gene expression quantification",
+                    platform = "Illumina HiSeq", 
+                    file.type = "results",
+                    experimental.strategy = "RNA-Seq",
+                    legacy = TRUE)
+  GDCdownload(query, method = "api", files.per.chunk = 10)
+  
+  data <- GDCprepare(query, )
+  tmp.expr <- assay(data)
+  tmp.samples <- paste(tissue[i], colData(data)$primary_diagnosis, sep="-")
+  
+  # Sample must have 20M reads
+  idx <- colSums(tmp.expr) > 20E6
+  tmp.expr <- tmp.expr[,idx]
+  tmp.samples <- tmp.samples[idx]
+  
+  # Randomly select 200 samples
+  idx <- sample(1:ncol(tmp.expr), 200)
+  tmp.expr <- tmp.expr[,idx]
+  tmp.samples <- tmp.samples[idx]
+  
+  if (nrow(expr) == 0) {
+    expr <- tmp.expr
+  } else {
+    expr <- cbind(expr, tmp.expr)
+  }
+  samples <- c(samples, tmp.samples)
+  classes <- c(classes, rep(tissue[i], length(tmp.samples)))
+}
+remove(tmp.expr, tmp.samples)
+classes <- factor(classes)
+
+table(classes)
+dim(expr)
+
+# Filtering
+# Genes must have 1024 mapped reads in at least 10 samples
+expr <- expr[rowSums(expr > 2^10) > 10,]
+dim(expr)
+
+save(expr, classes, file = "TCGA.RData")
+```
+
+
+at the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
