@@ -47,8 +47,8 @@ samples <- c()
 classes <- c()
 
 # Download RNA-Seq data for two selected projects
-tissue <- c("Skin", "Testis", "Ovaries", "Lung", "Prostate")
-proj   <- c("TCGA-BRCA", "TCGA-KIRC", "TCGA-COAD", "TCGA-LUAD", "TCGA-PRAD")
+tissue <- c("Skin", "Testis", "Ovary")
+proj   <- c("TCGA-SKCM", "TCGA-TGCT", "TCGA-OV")
 for (i in 1:length(proj)) {
 
   query <- GDCquery(project = proj[i],
@@ -69,8 +69,8 @@ for (i in 1:length(proj)) {
   tmp.expr <- tmp.expr[,idx]
   tmp.samples <- tmp.samples[idx]
   
-  # Randomly select 200 samples
-  idx <- sample(1:ncol(tmp.expr), 200)
+  # Randomly select 100 samples
+  idx <- sample(1:ncol(tmp.expr), 100)
   tmp.expr <- tmp.expr[,idx]
   tmp.samples <- tmp.samples[idx]
   
@@ -93,7 +93,7 @@ dim(expr)
 expr <- expr[rowSums(expr > 2^10) > 10,]
 dim(expr)
 
-save(expr, classes, file = "TCGA.RData")
+save(expr, classes, file = "Project_TCGA.RData")
 ```
 
 
