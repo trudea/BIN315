@@ -13,16 +13,21 @@ knitr::opts_chunk$set(echo = TRUE)
 
 ### Abstract
 ### Introduction
+Wanting to differentiate between rectum, colon, skin and testis/ovarian cancer
+Whether it is rectum or colon cancer plays a big difference treatment wise (https://healthblog.uofmhealth.org/cancer-care/how-colon-and-rectal-cancer-differ)
 ### Methods
 Supervised learning: 
 (a) PCA/hierarchal clustering/heatmap to get an initial overview of the data, 
 (b) differential expression analysis to reduce the dimensionality, 
 (c) machine learning to predict outcome, 
 (d) extract some biological insight from the machine learning model
+Implement at least two different machine learning methods and use feature selection (differential expression) and cross validation to evaluate them.
+
 
 
 ### Results
 ### Discussion
+Rectum is technically a part of the colon
 ### References
 
 http://www.sthda.com/english/articles/37-model-selection-essentials-in-r/152-principal-component-and-partial-least-squares-regression-essentials/ 
@@ -47,8 +52,8 @@ samples <- c()
 classes <- c()
 
 # Download RNA-Seq data for two selected projects
-tissue <- c("Skin", "Testis", "Ovary")
-proj   <- c("TCGA-SKCM", "TCGA-TGCT", "TCGA-OV")
+tissue <- c("Skin", "Testis", "Ovary", "Rectum", "Colon")
+proj   <- c("TCGA-SKCM", "TCGA-TGCT", "TCGA-OV", "TCGA-READ", "TCGA-COAD")
 for (i in 1:length(proj)) {
 
   query <- GDCquery(project = proj[i],
@@ -104,6 +109,8 @@ library(DESeq2)
 expr <- round(expr)
 
 SampleTable <- data.frame(classes)
+
+# Reads RNA-seq count data
 dds <- DESeqDataSetFromMatrix(expr, colData = SampleTable, design = ~classes)
 
 # Sets sample name according to where it was retrieved
@@ -118,4 +125,135 @@ expr.pca <- prcomp(t(assay(expr.norm)))
 plot(expr.pca$x[, 1], expr.pca$x[, 2], xlab = "PC1", ylab = "PC2", pch = 16, col = classes)
 legend("topright", legend = levels(classes), pch = 16, col = 1:5)
 ```
+## PCA compared to PLS
+
+```{r}
+
+```
+
+
+## Machine learning method
+### KNN
+```{r}
+library(class)
+
+n <- nrow(t(assay(expr.norm))) # Selects rows of transformed expr.norm (containing samples)
+selected.rows <- split(sample(n), rep(c("train","test"), length = n)) # Splits rows randomly into test and training
+
+expr.classes <- rownames(t(assay(expr.norm))) # Retrieves sample names for saving
+
+expr.unlabelled <- t(assay(expr.norm)) # Fetches data and labels samples as null 
+rownames(expr.unlabelled)<- NULL
+
+expr.train <- expr.unlabelled[selected.rows$train,] #Makes training data
+expr.test <- expr.unlabelled[selected.rows$test, ] # makes testdata
+
+expr.knn <- knn(expr.train, expr.test, classes[selected.rows$train], k = 4) # Runs KNN with 4 neighbors
+expr.knn.cv <- knn.cv(expr.unlabelled, classes, k=4) # Runs knn with cross validation
+knn_table <- table(classes, expr.knn.cv, dnn = c("Real", "Predicted"))
+
+# Calculate accuracy of method
+knn_table
+accuracy_knn <- sum(diag(knn_table))/ sum(knn_table)
+accuracy_knn
+```
+#### ROC kurve true positives vs false positive rate
+```{r}
+
+```
+
+
+### SVM
+
+```{r}
+library(e1071)
+
+# Trains model using training data
+svm.model <- svm(expr.train, classes[selected.rows$train])
+
+# Predict classes for test data
+svm.pred <- predict(svm.model, expr.test)
+
+# Create a confusion matrix
+confusion <- table(classes[selected.rows$test], svm.pred, dnn = c("Real", "Predicted"))
+confusion
+
+# Measure accuracy of method
+accuracy <- sum(diag(confusion))/ sum(confusion)
+
+accuracy
+
+## Now for training our SVM model:
+
+# Start by getting the indices for all possible test sets
+nsets <- 10 # The number of sets of different training/test data we want to use for cross validation
+n <- nrow(expr.unlabelled) # The number of samples in the iris data
+cv.sets <- split(sample(n), rep(seq_len(nsets), length = n)) # Create 10 different random sets of sample row numbers
+
+accuracies <- NULL
+# Iterate through the different sets of row numbers...
+for (set in cv.sets) {
+  # The current row numbers (`set`) corresponds to the test data, so
+  # for training, we use `-set` to use all samples but the test samples.
+  svm.model <- svm(expr.unlabelled[-set, ], classes[-set])
+  svm.pred <- predict(svm.model, expr.unlabelled[set, ])
+  confusion <- table(classes[set], svm.pred)
+  # Calculate current accuracy, and add to the list of accuracies
+  accuracies <- c(accuracies, sum(diag(confusion)) / sum(confusion)) 
+}
+# Calculate the mean accuracy from the 10 tests
+mean_accuracy <- mean(accuracies)
+mean_accuracy
+
+
+```
+#### ROC kurve true positives vs false positive rate 
+
+#### Grid search with SVM for data
+
+```{r}
+C <- c(0.001, 0.01, 0.1, 1, 10, 100, 1000, 10000, 100000)
+gamma <- c(0.00001, 0.0001, 0.001, 0.01, 0.1, 1, 10, 100, 1000, 10000)
+
+# Get all combinations of C and gamma with the `expand.grid` function.
+# It will return a data frame with the combinations, and that we then
+# `cbind` with an empty accuracy vector that we will fill in the
+# grid search.
+acc.df <- cbind(expand.grid(C = C, gamma = gamma), accuracy = NA)
+
+# For each C and gamma, find the accuracy of the model and add it to
+# the data frame.
+for (i in seq_len(nrow(acc.df))) {
+  svm.model <- svm(expr.train, classes[selected.rows$train], cost = acc.df[i, "C"], gamma = acc.df[i, "gamma"])
+  svm.pred <- predict(svm.model, expr.test)
+  confusion <- table(classes[selected.rows$test], svm.pred)
+  acc.df$accuracy[i] <- sum(diag(confusion)) / sum(confusion)
+}
+
+# Plot contours of accuracies for different C and gamma values
+library(ggplot2)
+library(directlabels)
+accuracy.contour <- ggplot(acc.df, aes(C, gamma, z = accuracy)) +
+  stat_contour(aes(colour = ..level..), binwidth = 0.15) +
+  scale_colour_gradient(low = "tomato", high = "forestgreen") +
+  scale_x_log10("C") + scale_y_log10(bquote(gamma)) + theme_bw()
+direct.label(accuracy.contour, "top.pieces")
+```
+For this data set it would be wise to have 
+#### ROC kurve true positives vs false positive rate
+
+## Gene set enrichment analysis hos krefttyper
+
+## Differential expression with adjustes p-value < 0.05
+```{r}
+# DEG analysis based on negative binomial distribution
+test <- DESeq(dds)
+
+# Retrieve base mean across samples
+res <- results(test)
+
+# Do test statistic to reduce dimensionality - we only want genes that contribute here in testis v ovary
+res0.05 <- subset(res, padj < 0.05)
+```
+
 
