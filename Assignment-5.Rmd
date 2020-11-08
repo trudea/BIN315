@@ -1,0 +1,184 @@
+---
+title: "Assignment 5"
+author: "Trude Almestrand"
+date: "7 10 2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Assignment 5
+## Questions of the week
+
+*1. A biologist has just read an article about machine learning, and decided to try it on his RNA-Seq data. Since he has many more genes than samples, he decided to do feature selection by choosing the most differentially expressed genes. He did feature selection first on the entire dataset and then validated his model using cross validation. To his dismay the analysis was heavily critiqued by the reviewers. They said he had to use an independent test set. The biologist doesn't understand the criticism and comes to you. Explain to him what he did wrong and why. Write approximately 250 words.*
+<<<<<<< HEAD
+Used class data in the feature selection
+
+
+*2. Let's say you want to "read" the genetic code using machine learning. You figure you can use GWAS populations as training data with SNPs as features and traits as labels. Will this approach fly? Discuss using concepts such as omnigenics, curse of dimensionality, model complexity and overfitting. Write approximately 250 words. *
+<<<<<<< HEAD
+SNPs in a given feature only works for monogenic traits. In order to read the genetic code for traits you would have to have a physical map of given traits and have already established if it is monogenic or polygenic. Seeing as we are trying to use GWAS populations as training data you would need 1000^SNPs observations (or GWAS populations). Here we have to many SNPs (features) compared to examples (training data). The curse of dimensionality is now that we will need millions of individuals to avoid overfitting. If we have a GWAS population an obvious feature selection would be to select significant SNPs. The problem with this is that we lose combinations of SNPs that may be important (omnigenic traits).       
+
+
+
+## Supervised learning
+
+
+*How many genes and samples are in the dataset? Hint: dim.*
+
+*How many samples are there for each class? Hint: table.*
+```{r}
+load(file = "TCGA.RData")
+
+dim(expr)
+
+#table(samples)
+```
+13946 genes and 1000 samples
+200 samples per class
+
+*The data we have is raw counts and needs to be normalized*
+*Use DESeq2 to find scale factors, and VST expression values.*
+```{r}
+library(beadarray)
+library(DESeq2)
+
+expr <- round(expr)
+
+SampleTable <- data.frame(classes)
+dds <- DESeqDataSetFromMatrix(expr, colData = SampleTable, design = ~classes)
+
+# Sets sample name according to where it was retrieved
+colnames(expr) <- classes
+#Performs normalization
+expr.norm <- varianceStabilizingTransformation(dds)
+
+# Runs PCA
+expr.pca <- prcomp(t(assay(expr.norm)))
+
+#Plots PCA
+plot(expr.pca$x[, 1], expr.pca$x[, 2], xlab = "PC1", ylab = "PC2", pch = 16, col = classes)
+legend("topright", legend = levels(classes), pch = 16, col = 1:5)
+```
+
+
+I think it would be easy to classify these samples using machine learning seeing as the variance of the data shows a nice distribution. Might be a bit difficult to differentiate between breast and lung. 
+
+```{r}
+library(class)
+
+n <- nrow(t(assay(expr.norm))) # Selects rows of transformed expr.norm (containing samples)
+selected.rows <- split(sample(n), rep(c("train","test"), length = n)) # Splits rows randomly into test and training
+
+expr.classes <- rownames(t(assay(expr.norm))) # Retrieves sample names for saving
+
+expr.unlabelled <- t(assay(expr.norm)) # Fetches data and labels samples as null 
+rownames(expr.unlabelled)<- NULL
+
+expr.train <- expr.unlabelled[selected.rows$train,] #Makes training data
+expr.test <- expr.unlabelled[selected.rows$test, ] # makes testdata
+
+expr.knn <- knn(expr.train, expr.test, classes[selected.rows$train], k = 4) # Runs KNN with 4 neighbors
+
+table(classes[selected.rows$test], expr.knn, dnn = c("Real", "Predicted")) # Creates matrix table
+```
+
+This KNN method appears to have near perfectly differentiated between the cancer types. Should redo it using cross validation. Results seems weird when compared to PCA plot (although that plot assumes linearity).
+
+```{r}
+expr.knn.cv <- knn.cv(expr.unlabelled, classes, k=4) # Runs knn with cross validation
+table(classes, expr.knn.cv, dnn = c("Real", "Predicted"))
+
+```
+*Present the cross validation predictions as a confusion matrix. What’s your conclusion about classifying cancer types from RNA-Seq data?*
+After running the K-NN with cross validation it appears the accuracy of the test is pretty good and we can easily differentiate between cancer types. 
+
+```{r}
+library(e1071)
+
+# Trains model using training data
+svm.model <- svm(expr.train, classes[selected.rows$train])
+
+# Predict classes for test data
+svm.pred <- predict(svm.model, expr.test)
+
+# Create a confusion matrix
+confusion <- table(classes[selected.rows$test], svm.pred, dnn = c("Real", "Predicted"))
+confusion
+
+# Measure accuracy of method
+accuracy <- sum(diag(confusion))/ sum(confusion)
+
+accuracy
+```
+
+```{r}
+# Start by getting the indices for all possible test sets
+nsets <- 10 # The number of sets of different training/test data we want to use for cross validation
+n <- nrow(expr.unlabelled) # The number of samples in the iris data
+cv.sets <- split(sample(n), rep(seq_len(nsets), length = n)) # Create 10 different random sets of sample row numbers
+
+accuracies <- NULL
+# Iterate through the different sets of row numbers...
+for (set in cv.sets) {
+  # The current row numbers (`set`) corresponds to the test data, so
+  # for training, we use `-set` to use all samples but the test samples.
+  svm.model <- svm(expr.unlabelled[-set, ], classes[-set])
+  svm.pred <- predict(svm.model, expr.unlabelled[set, ])
+  confusion <- table(classes[set], svm.pred)
+  # Calculate current accuracy, and add to the list of accuracies
+  accuracies <- c(accuracies, sum(diag(confusion)) / sum(confusion)) 
+}
+# Calculate the mean accuracy from the 10 tests
+mean_accuracy <- mean(accuracies)
+mean_accuracy
+```
+
+*Do a 2-fold cross validation and compute the prediction accuracy.*
+
+*Primarily use the Radial Basis Function for the kernel, but feel free to try other kernel functions. Remember that different kernels use different parameters.*
+
+*Optional: perform a grid search for different values of C and γ (for the RBF kernel).*
+
+```{r}
+C <- c(0.001, 0.01, 0.1, 1, 10, 100, 1000, 10000, 100000)
+gamma <- c(0.00001, 0.0001, 0.001, 0.01, 0.1, 1, 10, 100, 1000, 10000)
+
+# Get all combinations of C and gamma with the `expand.grid` function.
+# It will return a data frame with the combinations, and that we then
+# `cbind` with an empty accuracy vector that we will fill in the
+# grid search.
+acc.df <- cbind(expand.grid(C = C, gamma = gamma), accuracy = NA)
+
+# For each C and gamma, find the accuracy of the model and add it to
+# the data frame.
+for (i in seq_len(nrow(acc.df))) {
+  svm.model <- svm(expr.train, classes[selected.rows$train], cost = acc.df[i, "C"], gamma = acc.df[i, "gamma"])
+  svm.pred <- predict(svm.model, expr.test)
+  confusion <- table(classes[selected.rows$test], svm.pred)
+  acc.df$accuracy[i] <- sum(diag(confusion)) / sum(confusion)
+}
+
+# Plot contours of accuracies for different C and gamma values
+library(ggplot2)
+library(directlabels)
+accuracy.contour <- ggplot(acc.df, aes(C, gamma, z = accuracy)) +
+  stat_contour(aes(colour = ..level..), binwidth = 0.15) +
+  scale_colour_gradient(low = "tomato", high = "forestgreen") +
+  scale_x_log10("C") + scale_y_log10(bquote(gamma)) + theme_bw()
+direct.label(accuracy.contour, "top.pieces")
+```
+
+=======
+SNPs in a given feature only works for monogenic traits. In order to read the genetic code for traits you would have to have a physical map of given traits and have already established if it is monogenic or polygenic. Seeing as we are trying to use GWAS populations as training data you would need 1000^SNPs observations (or GWAS populations). Here we have to many SNPs (features) compared to examples (training data). The curse of dimensionality is now that we will need millions of individuals to avoid overfitting. If we have a GWAS population an obvious feature selection would be to select significant SNPs. The problem with this is that we lose combinations of SNPs that may be important (omnigenic traits).       
+>>>>>>> parent of 80b82ca... assignment 5 complete
+=======
+If he starts selecting DEGs one at a time he misses the feautre selection of eachother disregarding genes when compared to each other.
+He has overfitted his data by having too much selection in his training data. For training data you would have to assume a training set representative for data encountered in the future. By choosing to do a feature selection using only DEGs he does not take into account the non-DEGs (which are more common in nature). This leads to a wrong predictive model of what one can expect from any given dataset. When he then runs cross-validation after feature selection, he overfits the model. This leads to the model only being applicable for his dataset, and leads to new examples not being applicable to his dataset. What he should have done is using feature selection for each cross validation fold. 
+
+
+*2. Let's say you want to "read" the genetic code using machine learning. You figure you can use GWAS populations as training data with SNPs as features and traits as labels. Will this approach fly? Discuss using concepts such as omnigenics, curse of dimensionality, model complexity and overfitting. Write approximately 250 words. *
+SNPs in a given feature only works for monogenic traits. In order to read the genetic code for traits you would have to have a physical map of given traits and have already established if it is monogenic or polygenic. Seeing as we are trying to use GWAS populations as training data you would need 1000^SNPs observations (or GWAS populations). Here we have to many SNPs (features) compared to examples (training data). The curse of dimensionality is now that we will need millions of individuals to avoid overfitting. If we have a GWAS population an obvious feature selection would be to select significant SNPs. The problem with this is that we lose combinations of SNPs that may be important (omnigenic traits).       
+>>>>>>> master

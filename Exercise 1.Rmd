@@ -1,0 +1,104 @@
+---
+title: "Exercise 1"
+author: "Trude Almestrand"
+date: "9 9 2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+# The omnigenics model
+The omnigenics model was first postulated by E.A Boyle et al in 2017. The model suggests that regulatory networks in the genome are connected in a way that they affect functions of other related genes. Unlike Mendelian genomics and polygenic genomics they don't assume that a single locus (or combination of locus') contribute to the phenotypic variation, but that one part of the genome (that varies) can have an indirect effect on any other trait. According to Boyle et. Al core genes related to a specific phenotype/trait combined with their regulators and pathways, contribute to the trait. The theory states that all genes active in the expressed tissue affects the phenotype.  The impact that this has on our ability to understand biological systems is quite large. Previously we have based our knowledge on the typical polygenic genomics (before that the Mendelian), but based on the main evidences for this model it shows that we are far away from understanding the complexity of our origins. This model raises questions as to how heritability exists in the first place and also gives us a much more complex system to base our research upon. The model does not reject the idea that some core genes affect traits directly, but they postulate that outlying genes in and of themselves can affect the regulation of said core genes. 
+
+The proof of said model is based upon disease-related genes and the fact that the strongest genetic associations only explains a small part of the genetic variance. Meaning that the genes in and of themselves can't explain the expressed disease/trait and that many other loci may have a small effect. This theory is the basis for polygenic effect. By analyzing height (from GWAS datasets), which is considered a polygenic trait, they estimated that around 62% of all common SNPs are associated with a non-zero effect on height (both causal and nearby SNPs). This approach means that there is a large number of causal variants, each with a small effect on height. They are also very widely spread and in close proximity (the paper states 100 kb window) to the previously supposed causal genes (or combination of causal genes). To further the analysis they also analyzed whether or not the heritability signal is concentrated in active chromatin or just the relevant cell types. Using chromatin data from three GWAS studies with clear enrichment (Crohn's disease, rheumatoid arthritis and schizophrenia) they concluded that genetic contribution to disease is concentrated in marked regions of active chromatin in relevant tissues. Meaning that for Crohn's and RA the chromatin was most enriched in respectively the immune response and inflammatory response, and for schizophrenia mostly in the nervous system (with ontologies like ion channel activity). Lastly Boyle et. al also speculates that expression quantitative trait loci(eQTLs) may play a role in the regulatory network of genes (be it localization or modifications of mRNA and proteins). 
+
+source: Boyle, E.A, Li, Y.I, Pritchard, J.K, *"An Expanded View of Complex Traits: From Polygenic to Omnigenic"*, 2017, Stanford University, USA, https://doi.org/10.1016/j.cell.2017.05.038 
+
+
+## Exercises: indexing and subsetting
+In this exercise we will use one of the datasets that come with R. Type library(help = "datasets") to list all available datasets. You can get more detailed information for each datasets by typing, for example ?mtcars for the mtcars dataset which we will use in the following exercises.
+
+### Exercise 1.1
+
+Display the three first rows of the mtcars dataset (tips: it is a data frame). 
+```{r}
+mtcars[1:3,]
+```
+
+
+### Exercise 1.2
+
+Display the subset of the table with only cars that have 5 gears.
+
+```{r}
+mtcars[mtcars$"gear" == 5,]
+```
+
+Calculate how many cars that have 5 gears (tips: use sum())
+```{r}
+sum(mtcars$gear == 5)
+```
+
+Extract only the names of the cars that have 5 gears, as a character vector.
+```{r}
+attributes(subset(mtcars, gear == 5))$row.names
+```
+
+Display the subset of the table with only cars that have 4 gears and at least 100 hp.
+```{r}
+car <- mtcars[mtcars$"gear" == 5,]
+car <- car[car$"hp" >= 100, ]
+na.omit(car)
+```
+
+
+### Exercise 1.3
+Display the subset of the table with only Toyotas (hint: grepl()).
+```{r}
+subset(mtcars, grepl("Toyota", rownames(mtcars)))
+```
+
+Create a subset of the table with only Mercedes (Merc) but only include the two columns mpg and hp.
+```{r}
+mtcars[grepl("^Merc", rownames(mtcars)), c("mpg", "hp")]
+```
+
+
+### Exercise 1.4
+The sample() function can be used to sample a random subset from a vector (see help ?sample). Use sample() to display 5 random rows from the mtcars table.
+```{r}
+car <- sample(mtcars)
+car[1:5, ]
+```
+
+
+### Exercise 1.5
+The order() function returns the indices of a vector in sorted order (alphabetically or numerically depending on the type). E.g:
+
+Use the order function to display the 5 least fuel efficient cars (lowest mpg).
+```{r}
+mtcars.sorted <- order(mtcars$mpg)
+mtcars[mtcars.sorted[1:5], ]
+
+```
+
+### Exercise 2.1
+Use write.table() to write the mtcars data frame to a file, but set the parameters so that the row names are omitted, the strings are written without quotes and the columns are seperated by tabs instead of space (hint: tab = "\t"). Open the file to see that the format is correct.
+```{r cars}
+write.table(mtcars, quote = FALSE, sep = "\t", row.names = F, col.names = T)
+```
+
+### Exercise 2.2
+Figure out what parameters you need to set when calling read.table() to read this file so that you get the resulting data frame shown below:
+     VAR1 VAR2  VAR3
+row1 7.09 8.24 -2.48
+row2 5.11   NA 10.50
+row3 1.66   NA    NA
+row4 4.23 7.73 -1.63
+row5   NA 7.57 -2.16
+
+```{r}
+read.table("example_table.txt", header= T, sep = "\t", comment.char ="!", fill = TRUE)
+```
+

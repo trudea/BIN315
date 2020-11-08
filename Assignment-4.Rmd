@@ -1,0 +1,171 @@
+---
+title: "Assignment 4"
+author: "Trude Haug Almestrand"
+date: "29 9 2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Assignment 4
+
+### 1. What is the difference between using Euclidian distance and correlation in clustering analysis, and how does scaling affect these differences? Write approximately 250 words. 
+
+With euclidian distance you measure the shortest distance between the groups points' most close to each other. Whereas with correlation you measure to see if the variables you are analyzing are dependent of each other. For instance with pearson correlation you check linear dependence of each other. Seeing whether or not one group has an effect on the other group. Euclidian distance is the square root of the sum of squared differences whereas correlation is basically the average product. Euclidian distance is normally only applicable to data measured on the same scale (for instance kg or m). However between scaled versions of data the Euclidian and the correlation coefficient is inversely related. This is because when scaling Euclidian data the sums of data points are both equal to a fixed factor. Leaving only the correlationsum as the only non-constant term (like in correlation). 
+
+### 2. Case study: You are given a transcriptomics data set with measurement of gene expression (VST) in a number of individuals (genes x samples/individuals table). You are also given the results of several Chip-seq experiments that associate a number of transcription factors (TFs) with genes (TFs x genes table). You suspect that the individuals suffer from several different diseases possibly caused by mis-regulation of some of the same genes. You assume that the different diseases are caused by up-regulation of genes through up-regulation of TFs or mutations that recruit TFs to new promoters. You would like to find the subset of genes and TFs characteristic to each disease. How would you analyze the data? Explain how the chosen method works and how it would give the desired result. Write approximately 500 words. 
+
+Seeing as the data is already normalized using VST (Variance-stabilized transformation) I would continue by scaling it to log2.  By applying the varianceStabilizingTransformation it removes the larger spread of the higher variance and makes variances almost constant across the different observations. Useful for statistical analysis where we assume constant variance (Homoscedasticity). This normalization also accounts for differences in sequencing depth. Seeing as the TFs are associated with a gene already I would merge the data given in the dataset (after scaling the TF and gene expression data). Would sort the dataset by eliminating data that does not have a high variance. This is because we assume that an upregulated transcription factor may have an impact on gene regulation of a given disease type. We are in other words only interested in transcription factors with a high variance. Would then cluster the differential genes and TFs to see if they could belong to the same expression group. The clustering method I would use is bi-clustering. Bi-clustering allows us to cluster samples and genes simultaneously. This allows us to find clusters of genes that are co-expressed over a collection our two samples: TF expression data and gene expression data. For instance using an iterative signature algorithm we can provide a gene signature for each gene over x samples (from the combined dataset we have made). Then we can set a threshold of how high the average expression should be (for instance at 3), giving us a new sample signature for the genes with expression level over the threshold value. We can then further iterate until there is no newly found expressed genes in the datasets and it gives us an average expression value for genes. Would do the ISA for each disease and compare to healthy samples.  
+
+Would further on like to use the k-means method to group them into as many groups as the diseases we are analyzing to see if they are characteristic for the disease. Would also account for variation using the PCA method (if dimensions are the same). 
+Analysis of disease characteristics would be done using the enricher website. In other words just using functional enrichment analysis. Would sort by p-value and check for each disease if it seems representative or not.
+
+In order to visualize it clearer (what gene and tf for what disease) I would create a heatmap with annotation showing differences in diseased versus control. This method would also give a pointer if there is a difference in expression for control versus disease. Would do this individually for all diseases and expression type. 
+
+Could make the whole analysis easier by using the ping pong model. This model is an extension of the ISA which finds up-regulated genes in samples given our transcription factors. Here we start with a random gene signature and find where the genes are up-regulated. We then find a transcription signature (such as TFs with high variance) that ALSO gives a response in our diseased gene data (up-regulated genes). We then reiterate by regining the sample signature using the TF data and further refine the gene signature using the expression data. This method repeats until no changes are made. It is the same procedure as described above, but take TF more into account (as a way to actually iteratively change the data instead of first filtering it). This method does clustering on two different data sets and integrates different data sets to one analysis.
+
+source: Hvidsten, T.R,*BIN315 week 4 part D*, 2020, https://www.youtube.com/watch?v=0Yepcxx7LQI&feature=youtu.be   
+
+## Computer lab
+
+*What distance function does dist use as default?*
+The distance function used as default is the euclidian distance method.
+
+*Does the dist function calculate distances between rows or columns?*
+
+From ?dist it says: This function computes and returns the distance matrix computed by using the specified distance measure to compute the distances between the rows of a data matrix. So it measures distances between rows.
+
+*What hierarchical clustering method does hclust use as default?*
+?hclust says it uses the Lance-Williams dissimilarity update formula, which is an agglomerative hierarchical clustering procedure.
+
+
+
+*Perform hierarchical clustering on the normalized expression data for all genes and samples. Note: Remember that the dist function calculates the distances between rows. In the expression data, our samples are columns, so we need to rotate the table using the transpose function t(), before we pass it to the dist function.*
+```{r}
+library(beadarray)
+library(limma)
+
+load("voineagu_normalized_microarray.Rdata")
+load("voineagu_DEA_microarray.Rdata")
+
+bsd.cerebellum.norm.dist <- dist(t(exprs(bsd.cerebellum.norm)))
+bsd.cortex.norm.dist <- dist(t(exprs(bsd.cortex.norm)))
+bsd.norm.dist <- dist(t(exprs(bsd.norm)))
+
+bsd.cerebellum.norm.hc <- hclust(bsd.cerebellum.norm.dist)
+bsd.cortex.norm.hc <- hclust(bsd.cortex.norm.dist)
+bsd.norm.hc <- hclust(bsd.norm.dist)
+
+plot(bsd.cortex.norm.hc, label = pData(bsd.cortex.norm)$condition, hang = -1, main = "Cortex dendrogram")
+plot(bsd.cerebellum.norm.hc, label = pData(bsd.cerebellum.norm)$condition, hang = -1, main = "Cerebellum dendrogram")
+plot(bsd.norm.hc, label = pData(bsd.norm)$condition, hang = -1, main = "All data dendrogram") # Better to separate them
+
+```
+
+*As you can see in the clustering above, the results weren’t very clear. The autism and control samples were mixed together and not into separate groups. Using the expression of all genes we can’t separate clearly the conditions, as most genes don’t have a change in expression between the conditions.*
+
+*We will try to improve the clustering by not using all genes, but a subset of genes that we suspect might be responsible for differences between the conditions. The set of genes will be the differentially expressed genes we found in lab 3. These genes were detected to have different expression in autism and control, so using them should allow us to better cluster the conditions.*
+
+```{r}
+
+DEG <- topTable(cortex.fit, coef=2, lfc=log2(1.3), number = Inf, p.value=0.05)
+DEG.chosen <- DEG[1: 200,]
+gene.names <- attributes(DEG.chosen)$row.names
+
+condition <- pData(bsd.cortex.norm[gene.names, ])$condition
+sorted.cortex <- t(exprs(bsd.cortex.norm[gene.names, ]))
+ 
+bsd.cortex.dist <- dist(sorted.cortex)
+bsd.cortex.hc <- hclust(bsd.cortex.dist)
+
+plot(bsd.cortex.hc, hang = -1, main = "Improved cortex dendrogram", label = condition, cex.axis = 0.1)
+
+
+
+#conditionall <- pData(bsd.norm[gene.names, ])$condition
+#sorted.norm <- t(exprs(bsd.norm[gene.names, ]))
+ 
+#bsd.norm.dist <- dist(sorted.norm)
+#bsd.norm.hc <- hclust(bsd.norm.dist)
+
+#plot(bsd.norm.hc, hang = -1, main = "Improved dendrogram for all", label = conditionall, cex.axis = 0.1)
+
+
+
+```
+
+*Experiment with different numbers of differentially expressed genes. Can you find a number of DEGs that perfectly separates autism and control samples into two groups?*
+
+No I cant
+
+# Heatmap 
+
+```{r}
+library(pheatmap)
+
+annot.col <- data.frame(row.names =  rownames(sorted.cortex), Species = condition)
+
+pheatmap(t(as.matrix(sorted.cortex)), scale = "row", labels_col = as.character(condition), annotation_col = annot.col)
+
+```
+*What happens to the heatmap if you skip scale = "row" in the pheatmap-function? Explain.* 
+Then you wont scale the distances you have gotten and you wont be able to test for correlation. The data presented would just give you distance relative from each other but not the correlation between these distances.
+
+*Compare your plot with figure 1a in the paper by Voineagu et al. How well do they agree?*
+They don't agree at all it seems. 
+
+*Is this heatmap an example of supervised or unsupervised analysis? Discuss.*
+This is an unsupervised analysis seeing as the dataset has been manually adjusted without a specific desired outcome. Clustering is an example of unsupervised analysis because we define the data that groups data together. With clustering we find natural clusters if they exist. 
+
+```{r}
+bsd.kmeans <- kmeans(t(exprs(bsd.norm)), 2)
+
+table(bsd.kmeans$cluster, bsd.norm$condition , dnn = c("Cluster", "Class"))
+```
+
+*Perform k-means clustering on the normalized gene expression data for all genes. You want to separate autistic and control samples into two groups. How well does the clustering perform?*
+The clustering does not perform well seeing as there as as many autism and control genes in each cluster.
+
+*As for hierarchical clustering, we will also try using the top differentially expressed genes for this analysis: Redo the k-means clustering using the top 200 differentially expressed genes. Experiment with the number of genes that you use.*
+
+```{r}
+DEG.kmeans <- kmeans(as.matrix(sorted.cortex), 2)
+
+table(DEG.kmeans$cluster, condition, dnn = c("Cluster", "Class"))
+
+```
+*Is the result any different? Why?*
+The result clearly separates some genes from each other based on condition. There are only autism samples in cluster one whereas there is a mixture of both in 2. The results are different because this is a sorted list with our criteria of significant data. The previous clustering was performed with data not yet sorted by a log fold change of 1.3 and significance level 5%. 
+
+# PCA
+*Now it’s your turn to try PCA on the expression data. Run PCA on the normalized gene expression data with all genes. Create a scatterplot with the first two components. Color the points by condition. Also try to do the PCA using only the top differentially expressed probes in the dataset.*
+
+```{r}
+# PCA of bsd data
+bsd.pca <- prcomp(t(exprs(bsd.norm)))
+
+plot(bsd.pca$x[, 1], bsd.pca$x[, 2], xlab = "PC1", ylab = "PC2", pch = 16, col = c("Black", "Red"))
+legend("topright", legend = c("Autism", "Controls"), pch = 16, col = 1:2)
+
+# Summary of components
+summary(bsd.pca)
+```
+PC1 and 2 accounts for respectivally 42,67% and 20,62% of the variance in the bsd.norm dataset.
+
+```{r}
+cortex.pca <- prcomp(as.matrix(sorted.cortex))
+
+plot(cortex.pca$x[, 1], cortex.pca$x[, 2], xlab = "PC1", ylab = "PC2", pch = 16, col = c("Black", "Red"))
+legend("topright", legend = c("Autism", "Controls"), pch = 16, col = 1:2)
+
+summary(cortex.pca)
+```
+In cortex.pca PC1 and PC2 account for respectively 56.81% and 8% of the variance in the dataset. 
+
+*Based on the clustering results using data from all genes and top DEGs, do you think the differential expression analysis has successfully identified gene expression changes associated with autism?*
+
+Based on the clustering results I dont think the differential expression analysis has sucessfully identified gene expression changes associated with autism. This is because more than just the log fold change explains the difference in expressed genes. We also have to account for correlation between the different variables as well. 
+
+

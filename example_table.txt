@@ -1,0 +1,11 @@
+!title This is an example text table
+
+!comment  Some data may be missing.
+!table_start
+ROW_NAMES	VAR1	VAR2	VAR3
+row1	7.09	8.24	-2.48
+row2	5.11		10.5
+row3	1.66
+row4	4.23	7.73	-1.63
+row5		7.57	-2.16
+!table_end

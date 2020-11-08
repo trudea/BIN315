@@ -1,0 +1,270 @@
+---
+title: "Network analysis"
+author: "Trude Almestrand"
+date: "16 10 2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Assignment 6
+
+## QOTW
+
+*1. Given unlimited computational resources, how would you infer a Bayesian network from a gene expression table? Explain. Write approximately 250 words.*
+
+Using Bayes we assume that the causal structure satisfies the Causal Markov Assumption (each node depends only on its parent nodes). Further on a Bayesian Networks consists of two components: A network structure in the form of a directed acyclig graph (DAG). And a set of conditional probability distributions one for each variable (specified by network parameters). 
+
+ In order to infer a Bayesian network I would first sort the signifant data into either up or down-regulated in order to have two conditions to separate the data from. Log fold change positive = upregulated, log fold change negative = downregulated. Seeing as I have unlimited computational resources I would run the Bayesian algorithm (Bayes theorem) for all possible networks, not worried about computational time, then choosing the most probable network given the data.
+
+The result we get will be a network consisting of similar expression level for genes. 
+
+
+
+*2. A plant biologist is worried about how rising CO2 levels affect wheat production, and has therefore studied grain development at two different CO2 levels; A and B. He generated two transcriptomics datasets where gene expression is quantified across samples taken from multiple tissues and at different times using RNA-Seq. He then used these two datasets to infer two co-expression networks that describe expression similarities in conditions A and B, respectively. Looking at the networks he realizes that these are gigantic hairballs with thousands of nodes connected by millions of links. Hence it is not easy to identify the differences in co-expression between condition A and B. The biologist therefore comes to you. How would you analyze the data? Describe the method you would use and what type of results you would get by applying this method. Write approximately 250 words.* 
+
+Infer a network for each level. Construct differential network and matrix. Use hierarcical clustering to find altered clusters in the differential matrix.  What the results may show is a difference in gene networking between the two levels. Do genes lose or gain importance when compared to different CO2 levels. With this he can detect genes that gain or lose in expression levels and also the genes that stay the same. 
+
+He can perform a weighted co-expression analysis. Using this he can identify clusters of genes for further analysis instead of the many thousands he has found in his analysis. He can perform this the same way that has been done in this computer lab. First he can perform a rough clustering of both datasets separately in order to reduce computational time. Then contine on with the analysis by computing the correlation between modules, and within. This is a way to sort the data first of all, he does not want genes that do not correlate within the module. What he can then do is compare these two datasets by running a simple t test for his modules and then choosing the most significant ones for further analysis (meaning they are the most different). Then he can compute the pearson correlation between each gene expression and module (by the ones most significant in both datasets). He can then sort both datasets and see if there is a difference in the result between the two datasets. Which genes are the most central in each module? If there are different central genes it may show the answer he was looking for. Although I have not taken into account that clustering may not be the same, so perhaps it would be wise to merge them together with condition being the CO2 value and run this test as one dataset instead.   
+
+
+## Computer lab
+
+Weighted gene co-expression network analysis (WGCNA) is an R package, but also a method used to analyze expression data. In short, the principle behind this method is to infer a co-expression network which then is used to identify modules, i.e. clusters of genes, which can then be used for further analysis instead of tens of thousands of individual genes. In this lab we will try to reproduce the results achieved using the WGCNA in the Voineagu et al autistic brain study.
+
+```{r}
+library(WGCNA)
+library(beadarray)
+library(ggplot2)
+
+load(file= "voineagu_normalized_microarray.RData")
+```
+
+The blockwiseModules function first performs a rough clustering of the genes into manageable blocks before network construction and module detection is performed for each block. Dividing the data into blocks like this reduces the computation time and memory requirement significantly, but it may still take some minutes to complete. The parameters are set according to the method description in the article:
+
+```{r}
+exp <- t(exprs(bsd.cortex.norm))  # transpose the expression matrix to get samples in rows and genes in columns
+modules <- blockwiseModules(datExpr = exp, power = 10, minModuleSize = 40, minAbsSplitHeight = 0.1)
+```
+*What the different blockwiseModule does*
+blockwiseModule power: 	
+soft-thresholding power for network construction. Assumption is that by raising the correlation to a power will redce the noise of the correlations in the adhacency matrix. The power determines the correlation between the other genes to assess how much two genes are correlated.
+
+blockwisemodule minModuleSize:
+minimum module size for module detection, has to contain at least 40 genes.
+
+BlockwiseModules networkType("unsigned"), meaning the sign of the correlation does not matter. We want both negative and positive correlation. 
+```{r}
+str(modules)
+# Number of genes per module
+mod_genes = c()
+for (i in 1:ncol(modules$MEs)) {
+  mod_genes[i] <- sum(paste("ME", modules$colors, sep = "") == colnames(modules$MEs)[i])
+}
+names(mod_genes) <- colnames(modules$MEs)
+xx <- barplot(mod_genes, col = gsub("ME", "", colnames(modules$MEs)),
+     main = "Number of genes per module",
+     las = 2, cex.names = 0.65,)
+text(x = xx, y = mod_genes, label = mod_genes, pos = 3, cex = 0.8)
+```
+
+Look at the data returned from blockwiseModules (use str()). 
+```{r}
+str(modules)
+```
+
+*How do you get the module eigengenes (MEs) and how many are there? *
+There are 23 module eigengenes with 58 values each. They are located in a dataframe calle MEs in modules, so in order to retrieve it one would have to use modules$ME
+*Can you get the eigengene vector for the “magenta” ME?*
+```{r}
+modules$MEs["MEmagenta"]
+```
+
+
+```{r}
+# Compute correlation between all genes and all module eigengenes
+kME <- cor(exp, modules$MEs)
+
+# Correlation within modules
+intra_cor <- c()
+for (m in colnames(kME)) {
+  if (m != "MEgrey") {
+    intra_cor <- c(intra_cor, kME[paste("ME", modules$colors, sep = "") == m, m])
+  }
+}
+hist(intra_cor, xlim = c(-1,1), breaks = seq(-1,1,0.1),
+     main = "Correlations with module eigengene (within module correlation)",
+     xlab = "Correlation")
+
+
+# Correlation between modules
+idx <- which(colnames(modules$MEs) == "MEgrey")
+MEs_R <- cor(modules$MEs[,-idx], modules$MEs[,-idx])
+hist(MEs_R[upper.tri(MEs_R)], xlim = c(-1,1), breaks = seq(-1,1,0.1),
+     main = "Correlations of module eigengenes (between module correlation)",
+     xlab = "Correlation")
+```
+*Explain what you see in the three plot. Relate it to the parameter settings explained earlier.*
+In the first plot you can see the different number of genes per module.
+In the second plot you can see correlation within the module, this would be a test for our network parameters.
+In the third plot you can see correlation between the modules, it doe appear to be a high number of modules with high correlation.
+
+*Try removing the exception for the grey-module in the second plot (within module correlation). Explain what you see when correlations from the grey module are included.*
+An even plot. It appears as if grey is located with a correlation between -0,3 and 0,3. This eigengene is on the other hand noise in the dataset as we are only interested in correlation within modules, and it appears that grey has no correlation, it is most likely a "trash" network module. In other words a module where genes that could not be classified in another module was placed. This is evident in plot one as well where the gray module has the most genes.   
+
+```{r}
+intra_cor <- c()
+for (m in colnames(kME)) {
+    intra_cor <- c(intra_cor, kME[paste("ME", modules$colors, sep = "") == m, m])
+  }
+hist(intra_cor, xlim = c(-1,1), breaks = seq(-1,1,0.1),
+     main = "Correlations with module eigengene (within module correlation)",
+     xlab = "Correlation")
+```
+
+In the Voineagu article they calculate the module eigengene significance with regards to the disease state (autism vs control). This is similar to doing a differential expression test on the module eigengenes.
+
+```{r}
+# Find samples labled as autism
+hasAutism <- pData(bsd.cortex.norm)$condition=="autism" 
+
+# Run for each ME in modules: a t.test between autism and control samples, saving the pvalues from the test
+MEpval <- unlist(lapply(modules$MEs, function(ME){ t.test(ME[hasAutism], ME[!hasAutism])$p.value })) 
+
+# Calculate pvalues adjusted for multiple testing
+MEpval.adj <- p.adjust(MEpval, method="fdr")
+
+# Turn adjusted pvalue into a positive, scaled "significance" value by taking the inverse log10
+MEsignificance <- -log10(MEpval.adj)
+
+# Plot ME significance
+barplot(MEsignificance, col = substr(names(MEpval), 3, 20), las = 2, cex.names = 0.65,
+        ylab = "module eigengene significance")
+abline(h=-log10(0.05), lty = 3)
+```
+
+*Which five modules have the highest significance for correlation with the autism disease state? What are the p-values?*
+Purple, tan, darkgreen, black and lightyellow
+
+```{r}
+orderedSampleNames <- c(
+  "A_AN11989_T", "A_AN11989_F", "A_AN12457_T", "A_AN12457_F", "A_AN16115_F", "A_AN16641_T", "A_AN16641_F",
+  "A_AN17138_T", "A_AN17138_F", "A_AN17254_F", "A_AN17777_T", "A_AN17777_F", "A_AN19511_T", "A_AN19511_F",
+  "A_AN01570_T", "A_AN01570_F", "A_AN06420_T", "A_AN06420_F", "A_AN08166_T", "A_AN08166_F", "A_AN08792_T",
+  "A_AN08792_F", "A_AN08873_T", "A_AN08873_F", "A_AN09730_T", "A_AN09730_F", "A_AN00493_F", "A_AN00764_T",
+  "A_AN00764_F", "C_AN10028_T", "C_AN10028_F", "C_AN10833_T", "C_AN10833_F", "C_AN12137_F", "C_AN12240_T",
+  "C_AN12240_F", "C_AN14757_T", "C_AN14757_F", "C_AN15566_T", "C_AN15566_F", "C_AN17425_T", "C_AN17425_F",
+  "C_AN19442_T", "C_AN19442_F", "C_AN19760_T", "C_AN19760_F", "C_AN01125_T", "C_AN01125_F", "C_AN01410_F",
+  "C_AN03217_F", "C_AN04479_T", "C_AN04479_F", "C_AN07176_T", "C_AN07176_F", "C_AN00142_T", "C_AN00142_F",
+  "C_AN00544_T", "C_AN00544_F")
+
+# Match ordred sample names to names from the data to find the sample index order needed to order the data
+idx <- match(orderedSampleNames, pData(bsd.cortex.norm)$name)
+```
+
+
+*Below we have plotted the “expression” of the eigengene of the first significant module (MEcyan). Reproduce this plot for each of the five most significant modules and compare the results with figure 2-A in the article. Which module is most similar to the M12 module (figure 2-A)?*
+The purple module is the most similar to the M12 module in figure 2-a og the autistic brain article. 
+
+```{r}
+# Make a table of the most significant modules with autism and index.
+# we have to include indexing, rownames in df is in the same order rownames in bsd.cortex so idx is also likewise the same
+# proof: 
+match(rownames(df), rownames(pData(bsd.cortex.norm)))
+
+df <- data.frame(modules$MEs[c("MEpurple", "MEtan", "MEdarkgreen", "MEblack", "MElightyellow", "MEcyan")], hasAutism)
+
+colors = c("grey", "red")
+# then we plot with inedxing
+
+barplot(df$MEpurple[idx], main= "Model Eigengene Purple" ,col = colors[as.factor(df$hasAutism[idx])])
+legend("bottomright", legend = c("Autism", "Control"), fill = c("Red", "Grey"))
+
+barplot(df$MEtan[idx], main= "Model Eigengene Tan" ,col = colors[as.factor(df$hasAutism[idx])])
+legend("bottomright", legend = c("Autism", "Control"), fill = c("Red", "Grey"))
+
+barplot(df$MEdarkgreen[idx], main= "Model Eigengene Dark Green" ,col = colors[as.factor(df$hasAutism[idx])])
+legend("bottomright", legend = c("Autism", "Control"), fill = c("Red", "Grey"))
+
+barplot(df$MEblack[idx], main= "Model Eigengene Black" ,col = colors[as.factor(df$hasAutism[idx])])
+legend("bottomright", legend = c("Autism", "Control"), fill = c("Red", "Grey"))
+
+barplot(df$MElightyellow[idx], main= "Model Eigengene Light Yellow" ,col = colors[as.factor(df$hasAutism[idx])])
+legend("bottomright", legend = c("Autism", "Control"), fill = c("Red", "Grey"))
+```
+
+
+Instead of a binary module membership, where a gene is either a member of a module or not, we can also calculate a continuous measure of membership. In WGCNA, continuous module membership can be computed as the Pearson correlation between a gene’s expression profile and each module eigengene. This can be thought of as a measure of how central that gene is to each of the modules. The module membership of all genes can be calculated like this:
+
+```{r}
+# Measure module membership by calculating the correlation between genes and module eigengenes
+kME <- cor(exp, modules$MEs)
+kME <- as.data.frame(kME) # Convert to a data.frame
+
+symbols <- data.frame(fData(bsd.cortex.norm)$SYMBOL)
+Purple.genes <- data.frame(kME$MEpurple, symbols)
+# Sort by correlation
+Purple.genes <- Purple.genes[order(-Purple.genes$kME.MEpurple), ]
+Central.genes <- Purple.genes[1:10, ]
+
+```
+
+*Get the names of the ten most central genes (highest kME) from the M12-like module you found above (Hint: Create a table with two columns: scores from the kME-table from the right module and the gene names from fData(bsd.cortex.norm)$SYMBOL. These two tables have genes organized in the same order! Then sort by score). Do you recognize any of the genes from the center of Voineagu figure 2-B in your results? (Note that the gene A2BP1 is also known as RBFOX1.)*
+
+I recognize CNTNAP1, CHRM1, AP3B2, APBA2 and RBFOX1. Could also have taken the absolute value into account and sort the data that way so that the correlation between a decrease in a gene and increase in another is represented (|correlation|). 
+### Autism susceptibility gene enrichment in modules
+
+In the Voineagu article, they find that the M12 module has significant over-representation of autism susceptibility genes. On Canvas you can find the file supDataASDgenes.txt which contains a tab separated table of autism susceptibility genes (taken from the article’s supplementary table 10).
+
+Read in the file supDataASDgenes.txt using read.table(). The file is tab seperated ("\t") with a header row.
+
+```{r}
+ASDtbl <- read.table("supDataASDgenes.txt", header = TRUE, sep="\t", stringsAsFactors = FALSE)
+```
+
+In the article, they used the hyper-geometric test to test for over-representation in modules. They defined a gene to be in a module if their module membership was high (kME > 0.7).
+
+The parameters we need to perform a hyper-geometric test are: + the number of autism susceptibility genes in the module + the number of autism susceptibility genes (in the entire data set) + the number of genes that are not autism susceptibility genes (in the entire data set) + the number of genes in the module.
+
+Study the help page of the phyper-function. The hypergeometric test is described as drawing balls from an urn containing white and black balls. Describe the four parameters above in the language used in the help pages.
+
+Because there is not a 1:1 mapping between probes and genes we have to handle that properly. Firstly, probes that do not have a gene symbol are ignored. Secondly, the genes that have several probes will have several module membership values, these will be handled by calculating the mean value for all probes.
+
+Go through and try to understand the script below. Look at what the apply() and tapply() functions do.
+
+```{r}
+# Get the unique gene names present in the cortex data
+genesCortex <- na.omit(unique(fData(bsd.cortex.norm)$SYMBOL))
+
+# Get autism susceptibility genes that are also present in the cortex data (using %in% to compare lists)
+genesASD <- ASDtbl$Gene[ASDtbl$Gene %in% genesCortex]
+
+m <- length(genesASD) # number of ASD genes
+n <- length(genesCortex) - m # number of non-ASD genes
+
+# Calculate the probability of modules being enriched with austism susceptibility genes
+p.value <- apply(kME, 2, function(kMEcolumn){
+  # Map probes to gene names, calculating per gene the mean of the probes' module membership value
+  gene.kME <- tapply(kMEcolumn, fData(bsd.cortex.norm)$SYMBOL[, drop = TRUE], mean)
+  # How many genes in module, above the cutoff score
+  k <- sum(gene.kME > 0.7)
+  # How many ASD genes in module, above the cutoff score
+  kASD <- sum(gene.kME[genesASD] > 0.7)
+  # The probability of having that many ASD genes in the module by chance (hyper-geometric test)
+  return(1 - phyper(kASD - 1, m, n, k))
+})
+p.value <- p.value[order(p.value)] # Order by significance
+
+# Adjust pvalues for multiple testing
+p.adj <- p.adjust(p.value, method="fdr")
+```
+
+*Which modules do you find have a significant over-representation of autism susceptibility genes? Does this fit with what they find in the paper?*
+MEpurple (M12), MEtan, MEmidnightblue have significant overrepresentation (for significance <5%). For 1% however, it is only purple. This fits with what Voineagu found.
+
+*From the article: “Remarkably, unlike differentially expressed genes, M12 showed significant overrepresentation of known autism susceptibility genes2 (Supplementary Table 10; P = 6.1E-4)”. Try to explain how the network analysis was able to do what the differential expression analysis was not able to do.*
+In assignment 4 I said: Based on the clustering results I dont think the differential expression analysis has sucessfully identified gene expression changes associated with autism. This is because more than just the log fold change explains the difference in expressed genes. We also have to account for correlation between the different variables as well.
+
+In this analysis we have done precisely that! We have taken the correlation between genes into account giving rise to a more precise answer. Genes are mostly co-expressed and so it would be more logical to infer that in an analysis. 
