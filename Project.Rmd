@@ -23,6 +23,12 @@ Supervised learning:
 (d) extract some biological insight from the machine learning model
 Implement at least two different machine learning methods and use feature selection (differential expression) and cross validation to evaluate them.
 
+Continuing with rectum vs colon cancer in comparisment, 
+1.Infer a network for each condition (old and young mice)
+2.Construct differential network and matrix
+3.Use hieratical clustering to find altered clusters in the differential matrix
+
+*Use log fold change for colon and rectum to compare difference in expression and then analyse and see if we can differentiate them*
 
 
 ### Results
@@ -125,12 +131,7 @@ expr.pca <- prcomp(t(assay(expr.norm)))
 plot(expr.pca$x[, 1], expr.pca$x[, 2], xlab = "PC1", ylab = "PC2", pch = 16, col = classes)
 legend("topright", legend = levels(classes), pch = 16, col = 1:5)
 ```
-## PCA compared to PLS
-
-```{r}
-
-```
-
+Now this plot only accounts for 23 and 11.25% of the total variance, we might need to differentiate using clustering in rectum and the colon, see differences in co-expression. 
 
 ## Machine learning method
 ### KNN
@@ -255,5 +256,38 @@ res <- results(test)
 # Do test statistic to reduce dimensionality - we only want genes that contribute here in testis v ovary
 res0.05 <- subset(res, padj < 0.05)
 ```
+## PCA compared to PLS
+
+```{r}
+library(tidyverse)
+library(caret)
+library(pls)
+
+n <- nrow(t(assay(expr.norm))) # Selects rows of transformed expr.norm (containing samples)
+selected.rows <- split(sample(n), rep(c("train","test"), length = n)) # Splits rows randomly into test and training
+
+expr.classes <- rownames(t(assay(expr.norm))) # Retrieves sample names for saving
+
+expr.unlabelled <- t(assay(expr.norm)) # Fetches data and labels samples as null 
+rownames(expr.unlabelled)<- NULL
+
+expr.train <- expr.unlabelled[selected.rows$train,] #Makes training data
+expr.test <- expr.unlabelled[selected.rows$test, ] # makes testdata
+
+# Build the model on training set
+model <- train(
+  expr.train, method = "pcr",
+  scale = TRUE,
+  trControl = trainControl("cv", number = 10),
+  tuneLength = 10
+  )
+# Plot model RMSE vs different values of components
+plot(model)
+# Print the best tuning parameter ncomp that
+# minimize the cross-validation error, RMSE
+model$bestTune
+
+```
+
 
 
