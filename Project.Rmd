@@ -9,7 +9,7 @@ output: html_document
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
-## Project
+# Project
 
 ### Abstract
 ### Introduction
@@ -96,5 +96,26 @@ dim(expr)
 save(expr, classes, file = "Project_TCGA.RData")
 ```
 
+## PCA
+```{r}
+library(beadarray)
+library(DESeq2)
 
-at the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
+expr <- round(expr)
+
+SampleTable <- data.frame(classes)
+dds <- DESeqDataSetFromMatrix(expr, colData = SampleTable, design = ~classes)
+
+# Sets sample name according to where it was retrieved
+colnames(expr) <- classes
+#Performs normalization
+expr.norm <- varianceStabilizingTransformation(dds)
+
+# Runs PCA
+expr.pca <- prcomp(t(assay(expr.norm)))
+
+#Plots PCA
+plot(expr.pca$x[, 1], expr.pca$x[, 2], xlab = "PC1", ylab = "PC2", pch = 16, col = classes)
+legend("topright", legend = levels(classes), pch = 16, col = 1:5)
+```
+
