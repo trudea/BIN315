@@ -1,0 +1,140 @@
+Category	Gene	Locus	Evidence 
+asd_implicated	ADSL	22q13.1	Adenylosuccinate lyase deficiency (autosomal recessive) 
+asd_implicated	AFF2	Xq28	nonsyndromic XLMR 
+asd_implicated	AHI1	6q23.3	Joubert syndrome (autosomal recessive) 
+asd_implicated	ARX	Xp21	large spectrum of MR phenotypes: X_linked lissencephaly and abnormal genitalia, West syndrome, 
+asd_implicated	ATRX	Xq21.1	large spectrum of phenotypes, including ATRX syndrome and nonsyndromic XLMR 
+asd_implicated	C3orf58	3q24	DIA1 (Deleted in Autism), rare homozygous deletions 
+asd_implicated	CACNA1C	12p13.3	Timothy syndrome 
+asd_implicated	CDKL5	Xp22	Rett like syndrome with infanAle spasms 
+asd_implicated	CHD7	8q12.2	CHARGE syndrome 
+asd_implicated	CNTNAP2	7q36.1	Cortical dysplasia_focal epilepsy syndrome 
+asd_implicated	CREBBP	16p13.3	Rubinstein_Taybi syndrome 
+asd_implicated	DHCR7	11q13.2-q13.5	Smith_Lemli_OpAz syndrome 
+asd_implicated	DMD	Xp21.2	Muscular dystrophy, Duchenne and Becker types 
+asd_implicated	DMPK	19q13.3	Myotonic dystrophy type 1 
+asd_implicated	FGD1	Xp11.21	Aarskog_Scott syndrome, nonsyndromic XLMR 
+asd_implicated	FMR1	Xq27.3	Fragile X mental retardation 1, ASD 
+asd_implicated	IL1RAPL1	Xp22.1-p21.3	ASD, nonsyndromic XLMR 
+asd_implicated	MECP2	Xq28	Rett syndrome, syndromic and nonsyndromic XLMR, neonatal encephalopathy (in males) 
+asd_implicated	NF1	17q11.2	neurofibromatosis type 1, NF1 microdeletion/microduplication syndrome 
+asd_implicated	NIPBL	5p13.2	Cornelia de Lange syndrome 
+asd_implicated	NLGN3	Xq13.1	ASD, nonsyndromic XLMR 
+asd_implicated	NLGN4X	Xp22.32-p22.31	ASD, nonsyndromic XLMR 
+asd_implicated	NRXN1	2p16.3	disrupted in ASD, MR, schizophrenia 
+asd_implicated	NSD1	5q35.3	Sotos syndrome 
+asd_implicated	PTEN	10q23.3	PTEN hamartoma tumor syndrome 
+asd_implicated	PTPN11	12q24	Noonan syndrome 
+asd_implicated	RAI1	17p11.2	Smith_Magenis syndrome (deletion), Potocki_Lupski syndrome (duplication) (gene within locus) 
+asd_implicated	RPL10	Xq28	mutated in two ASD families, non syndromic XLMR 
+asd_implicated	SHANK3	22q13.3	22q13 deletion syndrome 
+asd_implicated	SLC6A8	Xq28	Creatine deficiency syndrome, nonsyndromic XLMR 
+asd_implicated	SLC9A9	3q24	rare homozygous deletions, sequence mutations 
+asd_implicated	TBX1	22q11.21	22q11 deletion syndrome (velocardiofacial/DiGeorge syndrome) (gene within locus) 
+asd_implicated	TSC1	9q34	Tuberous sclerosis 
+asd_implicated	TSC2	16p13.3	Tuberous sclerosis 
+asd_implicated	UBE3A	15q11-q13	Angelman syndrome (gene within locus) 
+asd_implicated	VPS13B	8q22.2	Cohen syndrome (autosomal recessive) 
+asd_candidates	RBFOX1	16p13.3	(A2BP1) de novo deletion 
+asd_candidates	AGAP1	2q37.2	association, linkage, rare CNV 
+asd_candidates	ANKRD11	16q24.3	de novo deletion 
+asd_candidates	ANKRD12	18p11.22	paralogue of ANKRD11 
+asd_candidates	ASTN1	1q25.2	paralogue of ASTN2 
+asd_candidates	ASTN2	9q33.1	rare CNV 
+asd_candidates	AUTS2	7q11.22	rare CNV 
+asd_candidates	AVPR1A	12q14.2	association 
+asd_candidates	B3GALT6	1p36.33	de novo deletion 
+asd_candidates	BZRAP1	17q22	rare CNV 
+asd_candidates	CA6	1p36.2	rare CNV 
+asd_candidates	CADPS2	7q31.3	rare CNV, association 
+asd_candidates	CAP2	6p22.3	de novo gain 
+asd_candidates	CD83	6p23	de novo deletion 
+asd_candidates	CDH10	5p14.2	association 
+asd_candidates	CDH18	5p14.3	translocation breakpoint 
+asd_candidates	CDH9	5p14.1	association 
+asd_candidates	CNTN3	3p12.3	rare CNV 
+asd_candidates	CNTN4	3p26.3	rare CNV 
+asd_candidates	CTNND2	5p15.2	rare CNV 
+asd_candidates	DISC1	1q42.1	association 
+asd_candidates	DLGAP2	8p23.3	de novo gain 
+asd_candidates	DPP10	2q14.1	rare CNV, paralogue of DPP6 
+asd_candidates	DPP6	7q36.2	rare CNV 
+asd_candidates	DPYD	1p21.3	de novo deletion 
+asd_candidates	DUOXA1	15q21.1	rare CNV 
+asd_candidates	EIF4E	4q23	translocation breakpoint 
+asd_candidates	EN2	7q36.3	association 
+asd_candidates	FBXO40	3q13.33	rare CNV 
+asd_candidates	FHIT	3p14.2	de novo deletion 
+asd_candidates	GABRA4	4p12	association 
+asd_candidates	GABRA5	15q12	rare CNV 
+asd_candidates	GABRB1	4p12	association 
+asd_candidates	GABRB3	15q12	association 
+asd_candidates	GABRG1	4p12	inversion breakpoint, chromosomal duplication 
+asd_candidates	GALNT13	2q24.1	rare CNV 
+asd_candidates	GALNT9	12q24.33	de novo deletion 
+asd_candidates	GATA3	10p14	de novo deletion 
+asd_candidates	GPR89A	1q21.1	rare CNV 
+asd_candidates	GRID1	10q23.1	rare CNV 
+asd_candidates	GRIK2	6q16.3	association, linkage (gene also in ID list) 
+asd_candidates	GRIN2A	16p13.2	association 
+asd_candidates	GRM8	7q31.33	rare CNV 
+asd_candidates	GRPR	Xp22.2	translocation breakpoint 
+asd_candidates	HOXA1	7p15.3	de novo deletion (gene also in ID list) 
+asd_candidates	HTR3A	11q23.1	association 
+asd_candidates	HTR3C	3q27.1	association 
+asd_candidates	INPP1	2q32.2	association 
+asd_candidates	ITGA4	2q31.3	association, translocation breakpoint 
+asd_candidates	ITGB3	17q21.32	association 
+asd_candidates	JMJD1C	10q21.2-q21.3	inversion breakpoint 
+asd_candidates	KCNMA1	10q22.3	translocation breakpoint 
+asd_candidates	KIAA1586	6p12.1	rare CNV 
+asd_candidates	KLHL3	5q31.2	translocation breakpoint 
+asd_candidates	LAMB1	7q31.1	association 
+asd_candidates	MDGA2	14q21.3	rare CNV 
+asd_candidates	MET	7q31.2	association 
+asd_candidates	MTF1	1p34.3	association 
+asd_candidates	NBEA	13q13.3	translocation breakpoint, de novo deletion 
+asd_candidates	NDNL2	15q13.1	rare CNV 
+asd_candidates	NDUFV3	21q22.3	de novo duplication 
+asd_candidates	NEGR1	1p31.1	translocation breakpoint 
+asd_candidates	NLGN1	3q26.31	rare CNV 
+asd_candidates	NRCAM	7q31.1	association 
+asd_candidates	OXTR	3p25.3	association 
+asd_candidates	PAK7	20p12	rare CNV 
+asd_candidates	PAPPA2	1q25.2	rare CNV 
+asd_candidates	PARK2	6q26	rare CNV 
+asd_candidates	PCDH10	4q28.3	rare CNV 
+asd_candidates	PCDH9	13q21.32	rare CNV 
+asd_candidates	PDE9A	21q22.3	de novo duplication 
+asd_candidates	PIK3CG	7q22.3	association
+asd_candidates	PIP5K1B	9q21.11	translocation breakpoint 
+asd_candidates	PKNOX1	21q22.3	de novo duplication 
+asd_candidates	PLN	6q22.31	rare CNV 
+asd_candidates	PRKAG2	7q36.1	rare CNV 
+asd_candidates	PRKCB	16p11.2	association 
+asd_candidates	PTCHD1	Xp22.11	de novo deletions 
+asd_candidates	RB1CC1	8q11.23	rare CNV 
+asd_candidates	REEP3	10q21.3	inversion breakpoint 
+asd_candidates	RFWD2	1q25.1-q25.2	rare CNV 
+asd_candidates	RIMS3	1p34.2	de novo deletion 
+asd_candidates	RNF182	6p23	de novo deletion 
+asd_candidates	RNF8	6p21.3	rare CNV 
+asd_candidates	SCN7A	2q24.3	rare CNV 
+asd_candidates	SEMA5A	5p15.2	association 
+asd_candidates	SHANK1	19q13.3	paralogue of SHANK3 
+asd_candidates	SHANK2	11q13.3	paralogue of SHANK3 
+asd_candidates	SLC25A12	2q31.1	association, linkage 
+asd_candidates	SLC4A10	2q24.2	de novo deletion 
+asd_candidates	SLC6A4	17q11.2	association 
+asd_candidates	SRPK2	7q22.2	inversion breakpoint 
+asd_candidates	ST7	7q31.2	translocation breakpoint 
+asd_candidates	STK3	8q22.2	translocation breakpoint 
+asd_candidates	SUCLG2	3p14.1	rare CNV 
+asd_candidates	TDO2	4q32.1	association 
+asd_candidates	TMEM195	7p21.1	de novo deletion 
+asd_candidates	TPH2	12q21.1	association 
+asd_candidates	TPPP	5p15.3	rare CNV 
+asd_candidates	UBE2H	7q32.2	association, paralogue of UBE3A 
+asd_candidates	WDR4	21q22.3	de novo duplication 
+asd_candidates	WNT2	7q31.2	association 
+asd_candidates	ZNF676	19p12	rare CNV 

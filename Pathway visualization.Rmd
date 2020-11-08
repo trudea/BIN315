@@ -1,0 +1,18 @@
+---
+title: "Pathway visualization"
+author: "Trude Almestrand"
+date: "18 10 2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+
+```{r}
+library(pathview)
+data(gse16873.d)   
+```
+
