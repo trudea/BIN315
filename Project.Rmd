@@ -243,7 +243,7 @@ direct.label(accuracy.contour, "top.pieces")
 For this data set it would be wise to have 
 #### ROC kurve true positives vs false positive rate
 
-## Gene set enrichment analysis hos krefttyper
+
 
 ## Differential expression with adjustes p-value < 0.05
 ```{r}
@@ -256,6 +256,8 @@ res <- results(test)
 # Do test statistic to reduce dimensionality - we only want genes that contribute here in testis v ovary
 res0.05 <- subset(res, padj < 0.05)
 ```
+
+
 ## PCA compared to PLS
 
 ```{r}
@@ -289,5 +291,101 @@ model$bestTune
 
 ```
 
+### Use only rectum and colon data
+
+```{r}
+if (!requireNamespace("BiocManager", quietly = TRUE))
+  install.packages("BiocManager")
+BiocManager::install("TCGAbiolinks")
+
+library(TCGAbiolinks)
+
+# View all projects
+# View(TCGAbiolinks:::getGDCprojects())
+
+expr <- data.frame()
+samples <- c()
+classes <- c()
+
+# Download RNA-Seq data for two selected projects
+tissue <- c( "Rectum", "Colon")
+proj   <- c("TCGA-READ", "TCGA-COAD")
+for (i in 1:length(proj)) {
+
+  query <- GDCquery(project = proj[i],
+                    data.category = "Gene expression",
+                    data.type = "Gene expression quantification",
+                    platform = "Illumina HiSeq", 
+                    file.type = "results",
+                    experimental.strategy = "RNA-Seq",
+                    legacy = TRUE)
+  GDCdownload(query, method = "api", files.per.chunk = 10)
+  
+  data <- GDCprepare(query, )
+  tmp.expr <- assay(data)
+  tmp.samples <- paste(tissue[i], colData(data)$primary_diagnosis, sep="-")
+  
+  # Sample must have 20M reads
+  idx <- colSums(tmp.expr) > 20E6
+  tmp.expr <- tmp.expr[,idx]
+  tmp.samples <- tmp.samples[idx]
+  
+  # Randomly select 100 samples
+  idx <- sample(1:ncol(tmp.expr), 100)
+  tmp.expr <- tmp.expr[,idx]
+  tmp.samples <- tmp.samples[idx]
+  
+  if (nrow(expr) == 0) {
+    expr <- tmp.expr
+  } else {
+    expr <- cbind(expr, tmp.expr)
+  }
+  samples <- c(samples, tmp.samples)
+  classes <- c(classes, rep(tissue[i], length(tmp.samples)))
+}
+remove(tmp.expr, tmp.samples)
+classes2 <- factor(classes)
+
+table(classes)
+dim(expr)
+
+# Filtering
+# Genes must have 1024 mapped reads in at least 10 samples
+expr2 <- expr[rowSums(expr > 2^10) > 10,]
+dim(expr2)
+
+save(expr2, classes2, file = "Project_TCGA_Rectum_and_Colon.RData")
+```
 
 
+
+```{r}
+library(beadarray)
+library(DESeq2)
+
+expr2 <- round(expr2)
+
+SampleTable <- data.frame(classes2)
+
+# Reads RNA-seq count data
+dds2 <- DESeqDataSetFromMatrix(expr2, colData = SampleTable, design = ~classes2)
+
+# Sets sample name according to where it was retrieved
+colnames(expr2) <- classes2
+#Performs normalization
+expr.norm2 <- varianceStabilizingTransformation(dds2)
+
+# Runs PCA
+expr.pca2 <- prcomp(t(assay(expr.norm2)))
+
+#Plots PCA
+plot(expr.pca2$x[, 1], expr.pca2$x[, 2], xlab = "PC1", ylab = "PC2", pch = 16, col = classes2)
+legend("topright", legend = levels(classes2), pch = 16, col = 1:5)
+```
+
+
+## Gene set enrichment analysis
+```{r}
+
+
+```
