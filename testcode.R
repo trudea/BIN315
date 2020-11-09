@@ -25,8 +25,11 @@ res_2 <- subset(res_new, res_new$log2FoldChange <= -1 & padj < 0.05)
 # Skjøter sammen tabellene
 res_n <- rbind(res_1, res_2)
 
-
 DESeq2::plotMA(res, alpha = 0.05)
+
+#choose the significant samples
+
+SignificantSamples <- # choose the column names equal to column name 
 
 id_table <- read.table("Human_ensembl_ids_to_symbols.txt", header = TRUE, sep = "\t", stringsAsFactors = FALSE)
 
