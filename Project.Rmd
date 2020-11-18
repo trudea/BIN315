@@ -11,11 +11,21 @@ knitr::opts_chunk$set(echo = TRUE)
 
 # Project
 
-### Abstract
-### Introduction
+## Abstract
+In this paper an attempt was made to differentiate cancer data using RNA-Seq data from TCGNA. The results showed a good separation between namely ovary, skin and testis cancer types, but it proved difficult to separate colon and rectum data. An attempt to separate the two cancer types using machine learning methods proved difficult with an FPR of x%. Feature selection was then used as an attempt to differentiate between the two. 
+
+## Introduction
 Wanting to differentiate between rectum, colon, skin and testis/ovarian cancer
 Whether it is rectum or colon cancer plays a big difference treatment wise (https://healthblog.uofmhealth.org/cancer-care/how-colon-and-rectal-cancer-differ)
-### Methods
+## Methods
+https://www.nature.com/articles/s41597-019-0207-2 
+Data was extracted from TCGA using code in Appendix 1. The data contained RNA-Seq data from Skin, Ovary, Testis, Colon and Rectum cancer patients. The criteria for the datasets was that the sample had to have at least 20 million reads and genes had to have over 1024 mapped reads in at least 10 samples. From each cancer project, 100 samples was randomly selected. 
+Principal component analysis (PCA) was performed using prcomp in the stats package. The two principal components were then visualized using the built in plot from base.
+Differential expression (DE) analysis was performed using DESeq from the DEseq2 package (version 1.28.1). All genes were 
+First, we used PCA to get an initial overview of the data.
+Then used a feature selection or DEG analysis to reduce dimensionality of the data. 
+After that we used two different machine learning methods, namely KNN and SVM with and without cross validation to compare. Afterwards we initialized a differential co-expression network for each condition and used hierarchical clustering to find altered clusters in the different conditions differentia matrix. We only compared testis vs ovary and rectum vs colon.  
+
 Supervised learning: 
 (a) PCA/hierarchal clustering/heatmap to get an initial overview of the data, 
 (b) differential expression analysis to reduce the dimensionality, 
@@ -31,19 +41,160 @@ Continuing with rectum vs colon cancer in comparisment,
 *Use log fold change for colon and rectum to compare difference in expression and then analyse and see if we can differentiate them*
 
 
-### Results
-### Discussion
-Rectum is technically a part of the colon
-### References
+## Results
+
+### Principal Component Analysis
+```{r}
+library(beadarray)
+library(DESeq2)
+
+load(file="Project_TCGA.RData")
+load(file="Project_TCGA_Rectum_and_Colon.RData")
+expr <- round(expr)
+
+SampleTable <- data.frame(classes) # Saves column data for samples
+colData <- data.frame(colnames(expr)) # Sets sample names to be colData
+
+dds <- DESeqDataSetFromMatrix(expr, colData = SampleTable, design = ~classes)
+
+# Sets sample name according to where it was retrieved
+colnames(expr) <- classes
+
+#Performs normalization
+expr.norm <- varianceStabilizingTransformation(dds)
+
+# Runs PCA
+expr.pca <- prcomp(t(assay(expr.norm)))
+
+#Plots PCA
+plot(expr.pca$x[, 1], expr.pca$x[, 2], xlab = "PC1", ylab = "PC2", pch = 16, col = classes)
+legend("topright", legend = levels(classes), pch = 16, col = 1:5)
+```
+*Figure 1 PCA of cancer data. Principal components only account for 34.25% of the deviation*
+
+The PCA plot in figure 1 shows a good separation on Ovarian, testicular and skin cancer data, but struggles to separate rectum and colon as expected.  After PCA only colon and rectum data were analysed. Continuing on the colon and rectum data was analyzed after DESeq feature selection (See appendix x)
+
+### K- Nearest Neighbours
+KNN testing was run to test if a linear function could separate the two cancer types.
+
+```{r}
+ks <- seq_len(50)
+nrun <- 100
+pred_accuracy <- c()
+for (k in ks) {
+  preds <- c()
+  for (i in seq_len(nrun)) {
+    k.pred <- knn.cv(expr.unlabelled, classes2, k = k)
+    confusion <- table(k.pred, classes2)
+    accuracy = sum(diag(confusion)) / sum(confusion)
+    preds <- c(preds, accuracy)
+  }
+  pred_accuracy <- c(pred_accuracy, mean(preds))
+}
+
+plot(ks, pred_accuracy, type = "o", pch = 16, col = 1, ylab = "Mean accuracy", xlab = "k")
+```
+*Figure 2 KNN testing with cross validation for most efficient KMER in separating colon and rectum data. Shows highest accuracy at 37. kmers.*
+Keep in mind that the dataset only has 200 possible k’s so the boundary between the classes using linear method is not distinct at all. 
+
+```{r}
+expr.knn <- knn(expr.train, expr.test, classes2[selected.rows$train], k = 36) # Runs KNN with 4 neighbors
+
+confusion <- table(classes2[selected.rows$test], expr.knn, dnn = c("Real", "Predicted")) # Creates matrix table
+
+confusion
+
+```
+*Figure 3 KNN table without cross validation for colon and rectum data after differential expression*
+
+```{r}
+expr.knn.cv <- knn.cv(expr.unlabelled, classes2, k=36) # Runs knn with cross validation
+
+cv.confusion <- table(classes2, expr.knn.cv, dnn = c("Real", "Predicted"))
+
+cv.confusion
+```
+*Figure 4 KNN table with cross validation showing predicted class types versus real*
+
+After running KNN without cross validation the initial observation from PCA plot is again observed. It appears to be difficult to separate rectum and colon data, whereas the other data is easier to separate. Without cross validation the accuracy was calculated to be 0.57, whereas with it was at 0.655. Which indicates that a linear model is not fitted for this dataset. Continuing with rectum vs colon cancer in comparisment, after cross validation the accuracy has decreased somewhat, but it is still difficult to separate rectum and colon.
+
+### Support vector machine
+
+```{r}
+library(e1071)
+
+# Trains model using training data
+svm.model <- svm(expr.train, classes2[selected.rows$train], kernel = "polynomial")
+
+# Predict classes for test data
+svm.pred <- predict(svm.model, expr.test)
+
+# Create a confusion matrix
+confusion <- table(classes2[selected.rows$test], svm.pred, dnn = c("Real", "Predicted"))
+confusion
+
+```
+*Figure 5 SVM without cross validation with a polynomial kernel*
+
+```{r}
+library(e1071)
+
+# Trains model using training data
+svm.model <- svm(expr.train, classes2[selected.rows$train], kernel = "sigmoid")
+
+# Predict classes for test data
+svm.pred <- predict(svm.model, expr.test)
+
+# Create a confusion matrix
+confusion <- table(classes2[selected.rows$test], svm.pred, dnn = c("Real", "Predicted"))
+confusion
+```
+*Figure 6 SVM modelling without cross validation using a sigmoid kernel*
+SVM without cross validation shows and accuracy of 0.57 for a polynomial kernel and 0.73 for a sigmoid kernel. After running a cross validation with 10 indices the error rate was calculated to be 0.58 for polynomial and 0.655 for the sigmoid kernel (see appendix x). With this low accuracy these two SVM non-linear methods may not be ideal for separating colon/rectum data. 
+
+### Random Forest
+```{r}
+set.seed(999)
+
+holdout <- sample(1:150, 90) #Creating an index for training data
+data <- t(assay(feature_selected_data.norm))
+
+library(randomForest)
+library(caret)
+
+data.rf1 <- randomForest(x = data[-holdout,-5], 
+                         y = feature_selected_data.norm$classes2[-holdout], 
+                         mtry = 2, ntree = 2000, 
+                         proximity = TRUE)
+
+# Predict outcome for test set
+y_predicted<- predict(data.rf1, data[holdout,-5])
+df1<-data.frame(Orig=feature_selected_data.norm$classes2[holdout], 
+                Pred=y_predicted)
+
+#Confusion matrix for test
+confusionMatrix(table(df1$Orig, df1$Pred))
+```
+*Figure 7 Confusion matrix and statistics showing Random Forest modelling of the Colon and Rectum cancer data*
+The random forest classification method shows an accuracy of 0.544 with a 95% confidence interval between [0.436, 0.6498]. Falling in the same accuracy rate of the other machine learning methods. 
+
+
+## Discussion
+
+The two machine learning methods has a similar accuracy at around 0.82. 
+The rectum is a part of the colon and it might be possible that rectum-cancer has been labelled as colon-cancer in this dataset. However seeing as they are so closely knit together in the PCA analysis there might also be anatomical reasons for this. According to the GO-analysis after sorting for significant genes using DESeq analysis, there are only 36 genes of significance. That is less that 0,08% of the total genes represented in this dataset. The GO analysis shows that the significant genes are prominent in proteolysis which is the first step in the utilization of protein in the human colon, and is in other words not so surprising. However, an article made by (ubiquinetous
+
+## References
 
 http://www.sthda.com/english/articles/37-model-selection-essentials-in-r/152-principal-component-and-partial-least-squares-regression-essentials/ 
 https://machinelearningmastery.com/feature-selection-with-real-and-categorical-data/ 
 https://www.r-bloggers.com/2014/05/evaluating-model-performance-a-practical-example-of-the-effects-of-overfitting-and-data-size-on-prediction/ 
+https://bmcbioinformatics.biomedcentral.com/articles/10.1186/s12859-016-1334-9 
 
 ## Extra
 
 Including code
-```{r}
+```{r} 
 if (!requireNamespace("BiocManager", quietly = TRUE))
   install.packages("BiocManager")
 BiocManager::install("TCGAbiolinks")
@@ -108,19 +259,20 @@ save(expr, classes, file = "Project_TCGA.RData")
 ```
 
 ## PCA
-```{r}
+```{r} 
 library(beadarray)
 library(DESeq2)
 
 expr <- round(expr)
 
-SampleTable <- data.frame(classes)
+SampleTable <- data.frame(classes) # Saves column data for samples
+colData <- data.frame(colnames(expr)) # Sets sample names to be colData
 
-# Reads RNA-seq count data
 dds <- DESeqDataSetFromMatrix(expr, colData = SampleTable, design = ~classes)
 
 # Sets sample name according to where it was retrieved
-colnames(expr) <- classes
+colnames(expr) <- classes2
+
 #Performs normalization
 expr.norm <- varianceStabilizingTransformation(dds)
 
@@ -131,52 +283,136 @@ expr.pca <- prcomp(t(assay(expr.norm)))
 plot(expr.pca$x[, 1], expr.pca$x[, 2], xlab = "PC1", ylab = "PC2", pch = 16, col = classes)
 legend("topright", legend = levels(classes), pch = 16, col = 1:5)
 ```
-Now this plot only accounts for 23 and 11.25% of the total variance, we might need to differentiate using clustering in rectum and the colon, see differences in co-expression. 
+Now this plot only accounts for 23 and 11.25% of the total variance, we might need to differentiate and filter significant genes in rectum and the colon, seeing as the other are differentiable. 
+
+## Feature Selection
+Rectum and colon data are present as expr2 and classes2
+
+```{r}
+library(tidyverse)
+
+load(file = "Project_TCGA_Rectum_and_Colon.RData")
+# Need to remove some data
+
+expr2 <- round(expr2)
+SampleTable2 <- data.frame(classes2)
+
+dds2 <- DESeqDataSetFromMatrix(expr2, colData = SampleTable2, design = ~classes2)
+
+
+dds2 <- DESeq(dds2)
+res <- results(dds2)
+res0.05 <- subset(res, padj < 0.05)
+res0.05[order(res0.05$padj),]
+
+# Upregulated
+sum(res0.05$log2FoldChange <= 0)
+
+# Downregulated
+sum(res0.05$log2FoldChange >= 0)
+
+# False positive rate 
+nrow(res0.05) * 0.05
+
+# Filtration of FDR
+
+# Lager deretter tabellen, deler opp i 2 da jeg slet med intervall
+res_new <- na.omit(res)
+res_1 <-  subset(res_new, res_new$log2FoldChange >= 1 & padj < 0.05)
+res_2 <- subset(res_new, res_new$log2FoldChange <= -1 & padj < 0.05)
+
+# Skjøter sammen tabellene
+res_n <- rbind(res_1, res_2)
+significant_genes <- rownames(res_n)
+
+feature_selected_data <- subset(dds2, rownames(dds2) %in% significant_genes)
+
+feature_selected_data.norm <- varianceStabilizingTransformation(feature_selected_data)
+
+```
+
+
+
 
 ## Machine learning method
-### KNN
+
+### Making training data
 ```{r}
 library(class)
 
-n <- nrow(t(assay(expr.norm))) # Selects rows of transformed expr.norm (containing samples)
+n <- nrow(t(assay(feature_selected_data.norm))) # Selects rows of transformed expr.norm (containing samples)
 selected.rows <- split(sample(n), rep(c("train","test"), length = n)) # Splits rows randomly into test and training
 
-expr.classes <- rownames(t(assay(expr.norm))) # Retrieves sample names for saving
+expr <- t(assay(feature_selected_data.norm))
+rownames(expr) <- classes2
 
-expr.unlabelled <- t(assay(expr.norm)) # Fetches data and labels samples as null 
+expr.classes <- rownames(t(assay(feature_selected_data.norm))) # Retrieves sample names for saving
+
+expr.unlabelled <- t(assay(feature_selected_data.norm)) # Fetches data and labels samples as null 
 rownames(expr.unlabelled)<- NULL
 
 expr.train <- expr.unlabelled[selected.rows$train,] #Makes training data
 expr.test <- expr.unlabelled[selected.rows$test, ] # makes testdata
-
-expr.knn <- knn(expr.train, expr.test, classes[selected.rows$train], k = 4) # Runs KNN with 4 neighbors
-expr.knn.cv <- knn.cv(expr.unlabelled, classes, k=4) # Runs knn with cross validation
-knn_table <- table(classes, expr.knn.cv, dnn = c("Real", "Predicted"))
-
-# Calculate accuracy of method
-knn_table
-accuracy_knn <- sum(diag(knn_table))/ sum(knn_table)
-accuracy_knn
 ```
-#### ROC kurve true positives vs false positive rate
+
+### KNN 
 ```{r}
 
+expr.knn <- knn(expr.train, expr.test, classes2[selected.rows$train], k = 36) # Runs KNN with 4 neighbors
+
+confusion <- table(classes2[selected.rows$test], expr.knn, dnn = c("Real", "Predicted")) # Creates matrix table
+
+# Measure accuracy of method
+accuracy <- sum(diag(confusion))/ sum(confusion)
+
+accuracy
+
+
+
+
+
+expr.knn.cv <- knn.cv(expr.unlabelled, classes2, k=36) # Runs knn with cross validation
+
+cv.confusion <- table(classes2, expr.knn.cv, dnn = c("Real", "Predicted"))
+
+sum(diag(cv.confusion))/ sum(cv.confusion)
+cv.confusion
+
 ```
 
+### Are any kmers more efficient?
+
+```{r}
+ks <- seq_len(50)
+nrun <- 100
+pred_accuracy <- c()
+for (k in ks) {
+  preds <- c()
+  for (i in seq_len(nrun)) {
+    k.pred <- knn.cv(expr.unlabelled, classes2, k = k)
+    confusion <- table(k.pred, classes2)
+    accuracy = sum(diag(confusion)) / sum(confusion)
+    preds <- c(preds, accuracy)
+  }
+  pred_accuracy <- c(pred_accuracy, mean(preds))
+}
+
+plot(ks, pred_accuracy, type = "o", pch = 16, col = 1, ylab = "Mean accuracy", xlab = "k")
+```
 
 ### SVM
 
-```{r}
+```{r}  
 library(e1071)
 
 # Trains model using training data
-svm.model <- svm(expr.train, classes[selected.rows$train])
+svm.model <- svm(expr.train, classes2[selected.rows$train], kernel = "polynomial")
 
 # Predict classes for test data
 svm.pred <- predict(svm.model, expr.test)
 
 # Create a confusion matrix
-confusion <- table(classes[selected.rows$test], svm.pred, dnn = c("Real", "Predicted"))
+confusion <- table(classes2[selected.rows$test], svm.pred, dnn = c("Real", "Predicted"))
 confusion
 
 # Measure accuracy of method
@@ -184,11 +420,12 @@ accuracy <- sum(diag(confusion))/ sum(confusion)
 
 accuracy
 
+
 ## Now for training our SVM model:
 
 # Start by getting the indices for all possible test sets
 nsets <- 10 # The number of sets of different training/test data we want to use for cross validation
-n <- nrow(expr.unlabelled) # The number of samples in the iris data
+n <- nrow(expr.unlabelled) # The number of samples in the data
 cv.sets <- split(sample(n), rep(seq_len(nsets), length = n)) # Create 10 different random sets of sample row numbers
 
 accuracies <- NULL
@@ -196,25 +433,51 @@ accuracies <- NULL
 for (set in cv.sets) {
   # The current row numbers (`set`) corresponds to the test data, so
   # for training, we use `-set` to use all samples but the test samples.
-  svm.model <- svm(expr.unlabelled[-set, ], classes[-set])
+  svm.model <- svm(expr.unlabelled[-set, ], kernel = "polynomial", classes2[-set])
   svm.pred <- predict(svm.model, expr.unlabelled[set, ])
-  confusion <- table(classes[set], svm.pred)
+  confusion <- table(classes2[set], svm.pred)
   # Calculate current accuracy, and add to the list of accuracies
   accuracies <- c(accuracies, sum(diag(confusion)) / sum(confusion)) 
 }
+
 # Calculate the mean accuracy from the 10 tests
 mean_accuracy <- mean(accuracies)
 mean_accuracy
 
 
+
 ```
+```{r}
+nsets <- 10 # The number of sets of different training/test data we want to use for cross validation
+n <- nrow(expr.unlabelled) # The number of samples in the data
+cv.sets <- split(sample(n), rep(seq_len(nsets), length = n)) # Create 10 different random sets of sample row numbers
+
+accuracies <- NULL
+# Iterate through the different sets of row numbers...
+for (set in cv.sets) {
+  # The current row numbers (`set`) corresponds to the test data, so
+  # for training, we use `-set` to use all samples but the test samples.
+  svm.model <- svm(expr.unlabelled[-set, ], kernel = "sigmoid", classes2[-set])
+  svm.pred <- predict(svm.model, expr.unlabelled[set, ])
+  confusion <- table(classes2[set], svm.pred)
+  # Calculate current accuracy, and add to the list of accuracies
+  accuracies <- c(accuracies, sum(diag(confusion)) / sum(confusion)) 
+}
+
+# Calculate the mean accuracy from the 10 tests
+mean_accuracy <- mean(accuracies)
+mean_accuracy
+```
+
+
 #### ROC kurve true positives vs false positive rate 
 
 #### Grid search with SVM for data
 
-```{r}
+```{r}  
 C <- c(0.001, 0.01, 0.1, 1, 10, 100, 1000, 10000, 100000)
 gamma <- c(0.00001, 0.0001, 0.001, 0.01, 0.1, 1, 10, 100, 1000, 10000)
+kernel <- c("linear", "polynomial", "radial", "sigmoid")
 
 # Get all combinations of C and gamma with the `expand.grid` function.
 # It will return a data frame with the combinations, and that we then
@@ -225,9 +488,9 @@ acc.df <- cbind(expand.grid(C = C, gamma = gamma), accuracy = NA)
 # For each C and gamma, find the accuracy of the model and add it to
 # the data frame.
 for (i in seq_len(nrow(acc.df))) {
-  svm.model <- svm(expr.train, classes[selected.rows$train], cost = acc.df[i, "C"], gamma = acc.df[i, "gamma"])
+  svm.model <- svm(expr.train, classes2[selected.rows$train], kernel = "sigmoid", cost = acc.df[i, "C"], gamma = acc.df[i, "gamma"])
   svm.pred <- predict(svm.model, expr.test)
-  confusion <- table(classes[selected.rows$test], svm.pred)
+  confusion <- table(classes2[selected.rows$test], svm.pred)
   acc.df$accuracy[i] <- sum(diag(confusion)) / sum(confusion)
 }
 
@@ -239,153 +502,128 @@ accuracy.contour <- ggplot(acc.df, aes(C, gamma, z = accuracy)) +
   scale_colour_gradient(low = "tomato", high = "forestgreen") +
   scale_x_log10("C") + scale_y_log10(bquote(gamma)) + theme_bw()
 direct.label(accuracy.contour, "top.pieces")
-```
+``` 
 For this data set it would be wise to have 
-#### ROC kurve true positives vs false positive rate
+
+## Random Forest
+```{r}  
+# code retrived from Liaw, no year
+
+# create training data
+set.seed(999)
+
+holdout <- sample(1:150, 90)
+data <- t(assay(feature_selected_data.norm))
+
+library(randomForest)
+
+data.rf1 <- randomForest(x = data[-holdout,-5], 
+                         y = feature_selected_data.norm$classes2[-holdout], 
+                         mtry = 2, ntree = 2000, 
+                         proximity = TRUE)
+rf
 
 
+# Display Variable Importance Plot shows the most important variable
+varImpPlot(data.rf1)
 
-## Differential expression with adjustes p-value < 0.05
-```{r}
-# DEG analysis based on negative binomial distribution
-test <- DESeq(dds)
+# Predict outcome for test set
+y_predicted<-predict(rf, data[holdout,-5])
+df1<-data.frame(Orig=feature_selected_data.norm$classes2[holdout], 
+                Pred=y_predicted)
 
-# Retrieve base mean across samples
-res <- results(test)
+#Confusion matrix for test
+confusionMatrix(table(df1$Orig, df1$Pred))
 
-# Do test statistic to reduce dimensionality - we only want genes that contribute here in testis v ovary
-res0.05 <- subset(res, padj < 0.05)
-```
+#dev.off()
+plot(data.rf1, main="")
+legend("topright", c("OOB", "Colon", "Rectum"), text.col=1:6, lty=1:3, col=1:3) 
+title(main="Error Rates Random Forest Feature selected Training data")
 
+#MDS on 1 - proximity
+data.mds <- cmdscale(1-data.rf1$proximity, eig=TRUE)
+op <- par(pty="s")
+pairs(cbind(classes2, data.mds$points), cex=0.6, gap=0,
+      col = c("red", "blue"), main= "TCGA data: predictors and mds of proximity based on randomforest")
+par(op)
+print(data.mds$GOF)
+      
 
-## PCA compared to PLS
-
-```{r}
-library(tidyverse)
-library(caret)
-library(pls)
-
-n <- nrow(t(assay(expr.norm))) # Selects rows of transformed expr.norm (containing samples)
-selected.rows <- split(sample(n), rep(c("train","test"), length = n)) # Splits rows randomly into test and training
-
-expr.classes <- rownames(t(assay(expr.norm))) # Retrieves sample names for saving
-
-expr.unlabelled <- t(assay(expr.norm)) # Fetches data and labels samples as null 
-rownames(expr.unlabelled)<- NULL
-
-expr.train <- expr.unlabelled[selected.rows$train,] #Makes training data
-expr.test <- expr.unlabelled[selected.rows$test, ] # makes testdata
-
-# Build the model on training set
-model <- train(
-  expr.train, method = "pcr",
-  scale = TRUE,
-  trControl = trainControl("cv", number = 10),
-  tuneLength = 10
-  )
-# Plot model RMSE vs different values of components
-plot(model)
-# Print the best tuning parameter ncomp that
-# minimize the cross-validation error, RMSE
-model$bestTune
 
 ```
+Optimale antall trær ville vært der OOB er på sitt laveste - som er ved ca 600 trær.
 
-### Use only rectum and colon data
+Out of Bag Error Rate:
+Random Forests algorithm is a classifier based on primarily two methods - bagging and random subspace method.
 
+Suppose we decide to have S number of trees in our forest then we first create S datasets of “same size as original” created from random resampling of data with-replacement. Each of these datasets is called a bootstrap dataset.
+
+Due to “with-replacement” option, every dataset can have duplicate data records and at the same time, can be missing several data records from original datasets. This is called Bagging.
+
+The algorithm uses m (=sqrt(M)) random sub features out of M possible features to create any tree. This is called random subspace method.
+
+After creating the classifiers (S trees), there is a subset of records which does not include any of the records part of the classifier tree. This subset, is a set of boostrap datasets which does not contain a particular record from the original dataset. This set is called out-of-bag examples. There are n such subsets (one for each data record in original dataset T). OOB classifier is the aggregation of all such records.
+
+Out-of-bag estimate for the generalization error is the error rate of the outof-bag classifier on the training set (compare it with known yi’s).
+
+Out-of-bag (OOB) error, also called out-of-bag estimate, is a method of measuring the prediction error of random forests, boosted decision trees, and other machine learning models utilizing bootstrap aggregating to subsample data samples used for training.
+
+Out-of-bag estimates help in avoiding the need for an independent validation dataset. source: https://rstudio-pubs-static.s3.amazonaws.com/380073_87c1e18284bc449c9a7877570c8118fb.html 
+
+## Hierarchical clustering and heatmap with correlation
 ```{r}
-if (!requireNamespace("BiocManager", quietly = TRUE))
-  install.packages("BiocManager")
-BiocManager::install("TCGAbiolinks")
+#
+data <- assay(feature_selected_data.norm)
+colnames(data) <- classes2
 
-library(TCGAbiolinks)
+set.seed(8)
+idx <- sample(1:nrow(data), 36)
+data <- data[idx, ]
 
-# View all projects
-# View(TCGAbiolinks:::getGDCprojects())
+# Hierarchical clustering - columns
+distC <- dist(t(data), method = "euclidean")
+as.matrix(distC)[1:7,1:7]
 
-expr <- data.frame()
-samples <- c()
-classes <- c()
-
-# Download RNA-Seq data for two selected projects
-tissue <- c( "Rectum", "Colon")
-proj   <- c("TCGA-READ", "TCGA-COAD")
-for (i in 1:length(proj)) {
-
-  query <- GDCquery(project = proj[i],
-                    data.category = "Gene expression",
-                    data.type = "Gene expression quantification",
-                    platform = "Illumina HiSeq", 
-                    file.type = "results",
-                    experimental.strategy = "RNA-Seq",
-                    legacy = TRUE)
-  GDCdownload(query, method = "api", files.per.chunk = 10)
-  
-  data <- GDCprepare(query, )
-  tmp.expr <- assay(data)
-  tmp.samples <- paste(tissue[i], colData(data)$primary_diagnosis, sep="-")
-  
-  # Sample must have 20M reads
-  idx <- colSums(tmp.expr) > 20E6
-  tmp.expr <- tmp.expr[,idx]
-  tmp.samples <- tmp.samples[idx]
-  
-  # Randomly select 100 samples
-  idx <- sample(1:ncol(tmp.expr), 100)
-  tmp.expr <- tmp.expr[,idx]
-  tmp.samples <- tmp.samples[idx]
-  
-  if (nrow(expr) == 0) {
-    expr <- tmp.expr
-  } else {
-    expr <- cbind(expr, tmp.expr)
-  }
-  samples <- c(samples, tmp.samples)
-  classes <- c(classes, rep(tissue[i], length(tmp.samples)))
-}
-remove(tmp.expr, tmp.samples)
-classes2 <- factor(classes)
-
-table(classes)
-dim(expr)
-
-# Filtering
-# Genes must have 1024 mapped reads in at least 10 samples
-expr2 <- expr[rowSums(expr > 2^10) > 10,]
-dim(expr2)
-
-save(expr2, classes2, file = "Project_TCGA_Rectum_and_Colon.RData")
-```
+treeC <- hclust(d=distC, method = "ward.D")
+dendroC <- as.dendrogram(treeC)
+plot(dendroC, main="Clustering of samples")
 
 
-
-```{r}
-library(beadarray)
-library(DESeq2)
-
-expr2 <- round(expr2)
-
-SampleTable <- data.frame(classes2)
-
-# Reads RNA-seq count data
-dds2 <- DESeqDataSetFromMatrix(expr2, colData = SampleTable, design = ~classes2)
-
-# Sets sample name according to where it was retrieved
-colnames(expr2) <- classes2
-#Performs normalization
-expr.norm2 <- varianceStabilizingTransformation(dds2)
-
-# Runs PCA
-expr.pca2 <- prcomp(t(assay(expr.norm2)))
-
-#Plots PCA
-plot(expr.pca2$x[, 1], expr.pca2$x[, 2], xlab = "PC1", ylab = "PC2", pch = 16, col = classes2)
-legend("topright", legend = levels(classes2), pch = 16, col = 1:5)
-```
+dendroC <- reorder(dendroC, 1:ncol(data), agglo.FUN = mean)
+plot(dendroC, main="Clustering of samples")
 
 
-## Gene set enrichment analysis
-```{r}
+# Scale rows
+d.scaled <- t(scale(t(data), center = TRUE, scale = TRUE))
 
+# Hierarchical clustering - genes
+distR <- as.dist(1-cor(t(d.scaled), method = "pearson"))
+treeR <- hclust(d=distR, method = "ward.D")
+dendroR <- as.dendrogram(treeR)
+
+
+library("gplots")
+
+colours <- colorRampPalette(c("Red", "Blue"))(2)[classes2]
+heatmap.2(x = as.matrix(data), 
+          Colv = dendroC,
+          Rowv = dendroR,
+          scale = "row",
+          trace = "none",
+          col = colorRampPalette(c("blue","white","red")),
+          cexCol = 0.8,
+          srtCol = 45,
+          labRow = rep("", nrow(data)), 
+          margins = c(4,3),
+          ColSideColors = colours
+)
+
+legend("left",      
+    legend = unique(classes2),
+    col = c("Red", "Blue"), 
+    lty= 1,             
+    lwd = 5,           
+    cex=.7
+    )
 
 ```
