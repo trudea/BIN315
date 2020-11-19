@@ -2,7 +2,11 @@
 title: "Project"
 author: "Trude Almestrand"
 date: "8 11 2020"
-output: html_document
+output:
+  html_document:
+    code_folding: hide
+    warning: FALSE
+    message: FALSE
 ---
 
 ```{r setup, include=FALSE}
@@ -12,194 +16,138 @@ knitr::opts_chunk$set(echo = TRUE)
 # Project
 
 ## Abstract
-In this paper an attempt was made to differentiate cancer data using RNA-Seq data from TCGNA. The results showed a good separation between namely ovary, skin and testis cancer types, but it proved difficult to separate colon and rectum data. An attempt to separate the two cancer types using machine learning methods proved difficult with an FPR of x%. Feature selection was then used as an attempt to differentiate between the two. 
+
+Machine learning is a form of data-analysis that automates the model building progress given a dataset. A multitude of modelling algorithms can be used with many different classes of methods. Machine learning has proven quite useful in biological processes and in this paper an attempt was made to differentiate cancer types using RNA-Seq data from The Cancer Genome Atlas Program. The results showed a good separation between namely ovary, skin and testis cancer types, but it proved difficult to separate colon and rectum cancer data. Feature selection was then used to reduce the data for colon and rectal cancer. An attempt to separate the two cancer types using a combination of linear an non-linear classification machine learning methods proved difficult with an accuracy spanning between 0.46 - 0.655. A suggestion to use different machine learning method for this classification such as deeplearning was made. 
 
 ## Introduction
-Wanting to differentiate between rectum, colon, skin and testis/ovarian cancer
-Whether it is rectum or colon cancer plays a big difference treatment wise (https://healthblog.uofmhealth.org/cancer-care/how-colon-and-rectal-cancer-differ)
+
+The Cancer Genome Atlas Program us a database consisting of 2.5 petabytes of genomic, epigenomic, transcriptomic and proteomic data (NCI, n.y). This data is publicly available for anyone. Using RNA-Seq data one could attempt to differentiate between the different cancer types available from TCGA. TCGA has lately become a "training" reference to apply machine learning algorithms with over 11 000 tumors across 33 major cancer types (NCI, n.y). Machine learning has in the later years facilitated the development of cancer classifier(Lim, 2019). In order to test a machine-learning method one could attempt to see if the method differentiates two cancer-data unrelated to another such as lung-cancer and ovarian cancer, or attempt to differentiate between two cancers difficult to differentiate. A good machine learning method is one with high accuracy and low false positive rate that can given new sets of data yield good results. 
+
+Using supervised learning one can learn a model from a set of examples given predefined classes or training examples (Hvidsten, 2020). For the TCGA data this means that using a given algorithm one can create a model fitting to the TCGA dataset that needs to be analysed. Differentiating between some cancertypes may prove useful for cancers hard to differentiate physically. Such as colon or rectal cancer which both have the same symptoms (Fayed, 2020). For rectal cancer it is more important do discover it sooner as the cancer can easily spread to other tissues. This paper will implement different machine learning methods (KNN, SVM, Random Forest) to attempt to differentiate between rectum, colon, skin, testis and ovarian cancer.
+
+
+
 ## Methods
-https://www.nature.com/articles/s41597-019-0207-2 
+
 Data was extracted from TCGA using code in Appendix 1. The data contained RNA-Seq data from Skin, Ovary, Testis, Colon and Rectum cancer patients. The criteria for the datasets was that the sample had to have at least 20 million reads and genes had to have over 1024 mapped reads in at least 10 samples. From each cancer project, 100 samples was randomly selected. 
-Principal component analysis (PCA) was performed using prcomp in the stats package. The two principal components were then visualized using the built in plot from base.
-Differential expression (DE) analysis was performed using DESeq from the DEseq2 package (version 1.28.1). All genes were 
-First, we used PCA to get an initial overview of the data.
-Then used a feature selection or DEG analysis to reduce dimensionality of the data. 
-After that we used two different machine learning methods, namely KNN and SVM with and without cross validation to compare. Afterwards we initialized a differential co-expression network for each condition and used hierarchical clustering to find altered clusters in the different conditions differentia matrix. We only compared testis vs ovary and rectum vs colon.  
+Principal component analysis (PCA) was performed using prcomp in the stats package. The two principal components were then visualized using the built in plot from base. PCA was performed to get an initial overview of the classes.
 
-Supervised learning: 
-(a) PCA/hierarchal clustering/heatmap to get an initial overview of the data, 
-(b) differential expression analysis to reduce the dimensionality, 
-(c) machine learning to predict outcome, 
-(d) extract some biological insight from the machine learning model
-Implement at least two different machine learning methods and use feature selection (differential expression) and cross validation to evaluate them.
+Differential expression (DE) analysis on the data types difficult to separate was performed using DESeq from the DEseq2 package (version 1.28.1). The significant genes was further normalized using DESeq2's VST-calculation. Significant genes was written into a csv file and the data from the significant genes were used for the rest of the analysis. 
 
-Continuing with rectum vs colon cancer in comparisment, 
-1.Infer a network for each condition (old and young mice)
-2.Construct differential network and matrix
-3.Use hieratical clustering to find altered clusters in the differential matrix
+Gene Ontology enrichment was performed using the csv file written from the significant gene data. The online tool Enrichr GO Biological Processes a list of enriched gene ontology terms was retrieved.   
 
-*Use log fold change for colon and rectum to compare difference in expression and then analyse and see if we can differentiate them*
+Training data was constructed using the normalized feature selected data. 
+Using the feature selected data, different machine learning methods were implemented.
+KNN, SVM and the Random Forest method was analyzed both with and without cross validation to compare. 
+KNN was performed using the class package from base.KNN testing was performed and the K with the highest accuracy was used to create a matrix table both with and without cross validation. 
+
+SVM was performed using the package e1071 (version 1.7-4). A polynomial and radial SVM was performed and both were cross-validated. The Random Forest classification was performed using the randomForest package (version 4.6-14). Test data was further predicted using the predict function from the stats package. Cross validation was run using code in appendix 9
 
 
 ## Results
 
+Code for the results can be seen in the appendix.
+
 ### Principal Component Analysis
-```{r}
-library(beadarray)
-library(DESeq2)
+![PCA](Pictures/PCA.png)  
 
-load(file="Project_TCGA.RData")
-load(file="Project_TCGA_Rectum_and_Colon.RData")
-expr <- round(expr)
-
-SampleTable <- data.frame(classes) # Saves column data for samples
-colData <- data.frame(colnames(expr)) # Sets sample names to be colData
-
-dds <- DESeqDataSetFromMatrix(expr, colData = SampleTable, design = ~classes)
-
-# Sets sample name according to where it was retrieved
-colnames(expr) <- classes
-
-#Performs normalization
-expr.norm <- varianceStabilizingTransformation(dds)
-
-# Runs PCA
-expr.pca <- prcomp(t(assay(expr.norm)))
-
-#Plots PCA
-plot(expr.pca$x[, 1], expr.pca$x[, 2], xlab = "PC1", ylab = "PC2", pch = 16, col = classes)
-legend("topright", legend = levels(classes), pch = 16, col = 1:5)
-```
 *Figure 1 PCA of cancer data. Principal components only account for 34.25% of the deviation*
 
-The PCA plot in figure 1 shows a good separation on Ovarian, testicular and skin cancer data, but struggles to separate rectum and colon as expected.  After PCA only colon and rectum data were analysed. Continuing on the colon and rectum data was analyzed after DESeq feature selection (See appendix x)
+The PCA plot in figure 1 shows a good separation on Ovarian, testicular and skin cancer data, but struggles to separate rectum and colon as expected.  After PCA only colon and rectum data were analysed. Continuing on the colon and rectum data was analyzed after DESeq feature selection (See appendix 3)
+
 
 ### K- Nearest Neighbours
 KNN testing was run to test if a linear function could separate the two cancer types.
 
-```{r}
-ks <- seq_len(50)
-nrun <- 100
-pred_accuracy <- c()
-for (k in ks) {
-  preds <- c()
-  for (i in seq_len(nrun)) {
-    k.pred <- knn.cv(expr.unlabelled, classes2, k = k)
-    confusion <- table(k.pred, classes2)
-    accuracy = sum(diag(confusion)) / sum(confusion)
-    preds <- c(preds, accuracy)
-  }
-  pred_accuracy <- c(pred_accuracy, mean(preds))
-}
+![KNN-test](Pictures/KNN-test.png)  
 
-plot(ks, pred_accuracy, type = "o", pch = 16, col = 1, ylab = "Mean accuracy", xlab = "k")
-```
+
 *Figure 2 KNN testing with cross validation for most efficient KMER in separating colon and rectum data. Shows highest accuracy at 37. kmers.*
-Keep in mind that the dataset only has 200 possible k’s so the boundary between the classes using linear method is not distinct at all. 
 
-```{r}
-expr.knn <- knn(expr.train, expr.test, classes2[selected.rows$train], k = 36) # Runs KNN with 4 neighbors
+The KNN test shows that a K of 37 neighbours prooved to yield a highest accuracy in this test-data. Keep in mind that the dataset only has 200 possible k’s so the boundary between the classes using linear method is not distinct at all. 
 
-confusion <- table(classes2[selected.rows$test], expr.knn, dnn = c("Real", "Predicted")) # Creates matrix table
 
-confusion
 
-```
-*Figure 3 KNN table without cross validation for colon and rectum data after differential expression*
+*Table 1 KNN table without cross validation for colon and rectum data after differential expression*
 
-```{r}
-expr.knn.cv <- knn.cv(expr.unlabelled, classes2, k=36) # Runs knn with cross validation
 
-cv.confusion <- table(classes2, expr.knn.cv, dnn = c("Real", "Predicted"))
+![KNN-test](Pictures/KNN.png) 
 
-cv.confusion
-```
-*Figure 4 KNN table with cross validation showing predicted class types versus real*
+
+*Table 2 KNN table with cross validation showing predicted class types versus real*
+
+
+![KNN-test](Pictures/KNN.cv.png) 
 
 After running KNN without cross validation the initial observation from PCA plot is again observed. It appears to be difficult to separate rectum and colon data, whereas the other data is easier to separate. Without cross validation the accuracy was calculated to be 0.57, whereas with it was at 0.655. Which indicates that a linear model is not fitted for this dataset. Continuing with rectum vs colon cancer in comparisment, after cross validation the accuracy has decreased somewhat, but it is still difficult to separate rectum and colon.
 
 ### Support vector machine
 
-```{r}
-library(e1071)
+*Table 3 SVM without cross validation with a polynomial kernel*
 
-# Trains model using training data
-svm.model <- svm(expr.train, classes2[selected.rows$train], kernel = "polynomial")
+![SVM polynomial](Pictures/SVM.png) 
 
-# Predict classes for test data
-svm.pred <- predict(svm.model, expr.test)
 
-# Create a confusion matrix
-confusion <- table(classes2[selected.rows$test], svm.pred, dnn = c("Real", "Predicted"))
-confusion
+*Table 4 SVM modelling without cross validation using a sigmoid kernel*
 
-```
-*Figure 5 SVM without cross validation with a polynomial kernel*
+![SVM sigmoid](Pictures/SVM-sigmoid.png) 
 
-```{r}
-library(e1071)
-
-# Trains model using training data
-svm.model <- svm(expr.train, classes2[selected.rows$train], kernel = "sigmoid")
-
-# Predict classes for test data
-svm.pred <- predict(svm.model, expr.test)
-
-# Create a confusion matrix
-confusion <- table(classes2[selected.rows$test], svm.pred, dnn = c("Real", "Predicted"))
-confusion
-```
-*Figure 6 SVM modelling without cross validation using a sigmoid kernel*
-SVM without cross validation shows and accuracy of 0.57 for a polynomial kernel and 0.73 for a sigmoid kernel. After running a cross validation with 10 indices the error rate was calculated to be 0.58 for polynomial and 0.655 for the sigmoid kernel (see appendix x). With this low accuracy these two SVM non-linear methods may not be ideal for separating colon/rectum data. 
+SVM without cross validation shows and accuracy of 0.57 for a polynomial kernel and 0.73 for a sigmoid kernel. After running a cross validation with 10 indices the error rate was calculated to be 0.58 for polynomial and 0.655 for the sigmoid kernel (see appendix 7). With this low accuracy these two SVM non-linear methods may not be ideal for separating colon/rectum data. 
 
 ### Random Forest
-```{r}
-set.seed(999)
 
-holdout <- sample(1:150, 90) #Creating an index for training data
-data <- t(assay(feature_selected_data.norm))
 
-library(randomForest)
-library(caret)
+*Table 5 Confusion matrix and statistics showing Random Forest modelling of the Colon and Rectum cancer data*
 
-data.rf1 <- randomForest(x = data[-holdout,-5], 
-                         y = feature_selected_data.norm$classes2[-holdout], 
-                         mtry = 2, ntree = 2000, 
-                         proximity = TRUE)
+![Random Forest Analysis](Pictures/Random-forest.png) 
 
-# Predict outcome for test set
-y_predicted<- predict(data.rf1, data[holdout,-5])
-df1<-data.frame(Orig=feature_selected_data.norm$classes2[holdout], 
-                Pred=y_predicted)
+The random forest classification method shows an accuracy of 0.64 with a 95% confidence interval between [0.4919, 0.7708]. Falling in the same accuracy rate of the other machine learning methods. With cross validation (1000 runs) however the accuracy had a mean of 0.46, falling below the confidence interval. Using OOB bootstrap implemented in the Random Forest a specificity of 0.4328 and sensitivity of 0.8696 was found with a detection rate of 0.3222. 
 
-#Confusion matrix for test
-confusionMatrix(table(df1$Orig, df1$Pred))
-```
-*Figure 7 Confusion matrix and statistics showing Random Forest modelling of the Colon and Rectum cancer data*
-The random forest classification method shows an accuracy of 0.544 with a 95% confidence interval between [0.436, 0.6498]. Falling in the same accuracy rate of the other machine learning methods. 
+### GO analysis
+
+![Significant genes and their supposed function](Pictures/GO-analysis.png)  
+
+*Figure 3 GO analysis between the feature selected genes in Colon and Rectum dataset*
+Figure 3 shows that the significant genes are prominent in the proteolysis part of the metabolic network. 
 
 
 ## Discussion
 
-The two machine learning methods has a similar accuracy at around 0.82. 
-The rectum is a part of the colon and it might be possible that rectum-cancer has been labelled as colon-cancer in this dataset. However seeing as they are so closely knit together in the PCA analysis there might also be anatomical reasons for this. According to the GO-analysis after sorting for significant genes using DESeq analysis, there are only 36 genes of significance. That is less that 0,08% of the total genes represented in this dataset. The GO analysis shows that the significant genes are prominent in proteolysis which is the first step in the utilization of protein in the human colon, and is in other words not so surprising. However, an article made by (ubiquinetous
+Using an PCA, an unsupervised method, it was proven rather quickly that skin, testis and ovarian cancer types are easily differentiable. However the principal components only accounted for 33.25% of the total variance meaning more analysis of these cancer types needs to be done. The focus was shifted toward colon and rectal cancer types as they proved to be the hardest to differentiate. 
+
+The three different machine learning methods had a similar accuracy at around 0.64. Proving it difficult to classify using linear, and non-linear methods.After running every method with cross validation the accuracy remained more or less the same in SVM and KNN giving rise to a difficult classification. For the Random Forest method, accuracy seemed to decrease after cross validation from 0.54 to 0.46, which is still in the 95% confidence interval seen in table 5. 
+
+The rectum is a part of the colon and it might be possible that rectum-cancer has been labelled as colon-cancer in this dataset. However seeing as they are so closely knit together in the PCA analysis there might also be anatomical reasons for this. According to the GO-analysis after sorting for significant genes using DESeq analysis, there are only 36 genes of significance. That is less that 0,08% of the total genes represented in this dataset. The GO analysis shows that the significant genes are prominent in proteolysis which is the first step in the utilization of protein in the human colon, and is in other words not so surprising. Another biological process discovered to be significant was the ion transport which is related to the human nervous system. The rectum has more nerve ending than the colon and the prominescence of such was again not surprising. GO-analysis using RNA-seq data did not give new information other than the biological differences between the colon and rectum. Making it seem as if the tumours are not differentiable from each other. 
+
+Another machine learning method that could have been implemented to try and differentiate between the two cancer types would have been using Deeplearning. Deeplearning uses the training data to implement weights so that the output given is correct (Hvidsten, 2020). Given the biological similarity between these two cancertypes it would prove difficult to train this data without overfitting the dataset. However, a suggestion can be made for further analysis of the colon/rectum dataset and implement the deeplearning using cross validation.
+
 
 ## References
 
-http://www.sthda.com/english/articles/37-model-selection-essentials-in-r/152-principal-component-and-partial-least-squares-regression-essentials/ 
-https://machinelearningmastery.com/feature-selection-with-real-and-categorical-data/ 
-https://www.r-bloggers.com/2014/05/evaluating-model-performance-a-practical-example-of-the-effects-of-overfitting-and-data-size-on-prediction/ 
-https://bmcbioinformatics.biomedcentral.com/articles/10.1186/s12859-016-1334-9 
+
+Fayed, L. *Differences Between Colorectal and Colon Cancer*, retrieved from verywellhealth (2020) read [19.11.20], https://www.verywellhealth.com/colon-cancer-and-colorectal-cancer-are-they-the-same-513949 
+
+Gillard, Grønvold & Mähler,  *BIN315: Lab 5- Supervised learning*, Canvas/BIN315-2020/Week-5 (2020).
+
+Hvidsten, T.R. *Week 5 - BIN315 Machine Learning*, Canvas/BIN315-2020/Week-5 (2020)
+
+Oehm, D. *Supervised Random Forest*, Gradient Descending (2018) retrieved 19.11.2020 from  http://gradientdescending.com/unsupervised-random-forest-example/ 
+
+Lim, S.B., Tan, S.J., Lim, WT. et al. *Compendiums of cancer transcriptomes for machine learning applications.* Sci Data 6, 194 (2019). https://doi.org/10.1038/s41597-019-0207-2 
+
+The National Cancer Institute, *The Cancer Genome Atlas Program* (No Year) retrieved 19.11.2020 from https://www.cancer.gov/about-nci/organization/ccg/research/structural-genomics/tcga
 
 ## Extra
 
-Including code
-```{r} 
+### Appendix 1 data retrieval
+Code retrieved from Gillard, Grønvold & Mähler (2020)
+```{r, eval=FALSE}  
+
 if (!requireNamespace("BiocManager", quietly = TRUE))
   install.packages("BiocManager")
 BiocManager::install("TCGAbiolinks")
 
-library(TCGAbiolinks)
+suppressPackageStartupMessages(library(TCGAbiolinks))
 
 # View all projects
 # View(TCGAbiolinks:::getGDCprojects())
@@ -258,20 +206,24 @@ dim(expr)
 save(expr, classes, file = "Project_TCGA.RData")
 ```
 
-## PCA
-```{r} 
-library(beadarray)
-library(DESeq2)
+### Appendix 2 PCA 
+Code retrieved from Gillard, Grønvold & Mähler (2020)
+```{r, results='hide',message=FALSE, warning=FALSE}
+suppressPackageStartupMessages(library(beadarray))
+suppressPackageStartupMessages(library(DESeq2))
+
+load(file="Project_TCGA.RData")
+load(file="Project_TCGA_Rectum_and_Colon.RData")
 
 expr <- round(expr)
 
 SampleTable <- data.frame(classes) # Saves column data for samples
-colData <- data.frame(colnames(expr)) # Sets sample names to be colData
+colData <- data.frame(colnames(expr)) # Sets sample names to be colData 
 
-dds <- DESeqDataSetFromMatrix(expr, colData = SampleTable, design = ~classes)
+dds <- DESeqDataSetFromMatrix(expr, colData = SampleTable, design = ~classes) 
 
 # Sets sample name according to where it was retrieved
-colnames(expr) <- classes2
+colnames(expr) <- classes
 
 #Performs normalization
 expr.norm <- varianceStabilizingTransformation(dds)
@@ -285,13 +237,12 @@ legend("topright", legend = levels(classes), pch = 16, col = 1:5)
 ```
 Now this plot only accounts for 23 and 11.25% of the total variance, we might need to differentiate and filter significant genes in rectum and the colon, seeing as the other are differentiable. 
 
-## Feature Selection
+### Appendix 3 Feature Selection
 Rectum and colon data are present as expr2 and classes2
 
-```{r}
-library(tidyverse)
+```{r, results='hide',message=FALSE, warning=FALSE} 
+suppressPackageStartupMessages(library(tidyverse))
 
-load(file = "Project_TCGA_Rectum_and_Colon.RData")
 # Need to remove some data
 
 expr2 <- round(expr2)
@@ -334,11 +285,12 @@ feature_selected_data.norm <- varianceStabilizingTransformation(feature_selected
 
 
 
-## Machine learning method
 
-### Making training data
-```{r}
-library(class)
+
+### Appendix 4 Making training data
+Code retrieved from Gillard, Grønvold & Mähler (2020)
+```{r, results='hide',message=FALSE, warning=FALSE}
+suppressPackageStartupMessages(library(class))
 
 n <- nrow(t(assay(feature_selected_data.norm))) # Selects rows of transformed expr.norm (containing samples)
 selected.rows <- split(sample(n), rep(c("train","test"), length = n)) # Splits rows randomly into test and training
@@ -355,8 +307,9 @@ expr.train <- expr.unlabelled[selected.rows$train,] #Makes training data
 expr.test <- expr.unlabelled[selected.rows$test, ] # makes testdata
 ```
 
-### KNN 
-```{r}
+### Appendix 5 KNN 
+Code retrieved from Gillard, Grønvold & Mähler (2020)
+```{r, results='hide',message=FALSE, warning=FALSE}
 
 expr.knn <- knn(expr.train, expr.test, classes2[selected.rows$train], k = 36) # Runs KNN with 4 neighbors
 
@@ -369,8 +322,6 @@ accuracy
 
 
 
-
-
 expr.knn.cv <- knn.cv(expr.unlabelled, classes2, k=36) # Runs knn with cross validation
 
 cv.confusion <- table(classes2, expr.knn.cv, dnn = c("Real", "Predicted"))
@@ -380,9 +331,9 @@ cv.confusion
 
 ```
 
-### Are any kmers more efficient?
-
-```{r}
+### Appendix 6 Are any kmers more efficient?
+Code retrieved from Gillard, Grønvold & Mähler (2020)
+```{r, results='hide',message=FALSE, warning=FALSE}
 ks <- seq_len(50)
 nrun <- 100
 pred_accuracy <- c()
@@ -400,10 +351,11 @@ for (k in ks) {
 plot(ks, pred_accuracy, type = "o", pch = 16, col = 1, ylab = "Mean accuracy", xlab = "k")
 ```
 
-### SVM
+### Appendix 7 SVM
+Code retrieved from Gillard, Grønvold & Mähler (2020)
 
-```{r}  
-library(e1071)
+```{r, results='hide',message=FALSE, warning=FALSE}
+suppressPackageStartupMessages(library(e1071))
 
 # Trains model using training data
 svm.model <- svm(expr.train, classes2[selected.rows$train], kernel = "polynomial")
@@ -447,7 +399,7 @@ mean_accuracy
 
 
 ```
-```{r}
+```{r, results='hide',message=FALSE, warning=FALSE}
 nsets <- 10 # The number of sets of different training/test data we want to use for cross validation
 n <- nrow(expr.unlabelled) # The number of samples in the data
 cv.sets <- split(sample(n), rep(seq_len(nsets), length = n)) # Create 10 different random sets of sample row numbers
@@ -470,11 +422,10 @@ mean_accuracy
 ```
 
 
-#### ROC kurve true positives vs false positive rate 
-
 #### Grid search with SVM for data
 
-```{r}  
+Code retrieved from Gillard, Grønvold & Mähler (2020)
+```{r, results='hide',message=FALSE, warning=FALSE}
 C <- c(0.001, 0.01, 0.1, 1, 10, 100, 1000, 10000, 100000)
 gamma <- c(0.00001, 0.0001, 0.001, 0.01, 0.1, 1, 10, 100, 1000, 10000)
 kernel <- c("linear", "polynomial", "radial", "sigmoid")
@@ -503,11 +454,13 @@ accuracy.contour <- ggplot(acc.df, aes(C, gamma, z = accuracy)) +
   scale_x_log10("C") + scale_y_log10(bquote(gamma)) + theme_bw()
 direct.label(accuracy.contour, "top.pieces")
 ``` 
-For this data set it would be wise to have 
 
-## Random Forest
-```{r}  
-# code retrived from Liaw, no year
+
+### Appendix 8 Random Forest
+
+code retrived from Oehm, no year
+```{r, results='hide',message=FALSE, warning=FALSE}
+# 
 
 # create training data
 set.seed(999)
@@ -515,11 +468,12 @@ set.seed(999)
 holdout <- sample(1:150, 90)
 data <- t(assay(feature_selected_data.norm))
 
-library(randomForest)
+suppressPackageStartupMessages(library(randomForest))
+suppressPackageStartupMessages(library(caret))
 
 data.rf1 <- randomForest(x = data[-holdout,-5], 
                          y = feature_selected_data.norm$classes2[-holdout], 
-                         mtry = 2, ntree = 2000, 
+                         mtry = 2, ntree = 600, 
                          proximity = TRUE)
 rf
 
@@ -528,7 +482,7 @@ rf
 varImpPlot(data.rf1)
 
 # Predict outcome for test set
-y_predicted<-predict(rf, data[holdout,-5])
+y_predicted<-predict(data.rf1, data[holdout,-5])
 df1<-data.frame(Orig=feature_selected_data.norm$classes2[holdout], 
                 Pred=y_predicted)
 
@@ -540,10 +494,11 @@ plot(data.rf1, main="")
 legend("topright", c("OOB", "Colon", "Rectum"), text.col=1:6, lty=1:3, col=1:3) 
 title(main="Error Rates Random Forest Feature selected Training data")
 
+
 #MDS on 1 - proximity
 data.mds <- cmdscale(1-data.rf1$proximity, eig=TRUE)
 op <- par(pty="s")
-pairs(cbind(classes2, data.mds$points), cex=0.6, gap=0,
+pairs(cbind(data[-holdout,-5], data.mds$points), cex=0.6, gap=0,
       col = c("red", "blue"), main= "TCGA data: predictors and mds of proximity based on randomforest")
 par(op)
 print(data.mds$GOF)
@@ -553,77 +508,39 @@ print(data.mds$GOF)
 ```
 Optimale antall trær ville vært der OOB er på sitt laveste - som er ved ca 600 trær.
 
-Out of Bag Error Rate:
-Random Forests algorithm is a classifier based on primarily two methods - bagging and random subspace method.
+### Appendix 9 Cross validation of trees
 
-Suppose we decide to have S number of trees in our forest then we first create S datasets of “same size as original” created from random resampling of data with-replacement. Each of these datasets is called a bootstrap dataset.
-
-Due to “with-replacement” option, every dataset can have duplicate data records and at the same time, can be missing several data records from original datasets. This is called Bagging.
-
-The algorithm uses m (=sqrt(M)) random sub features out of M possible features to create any tree. This is called random subspace method.
-
-After creating the classifiers (S trees), there is a subset of records which does not include any of the records part of the classifier tree. This subset, is a set of boostrap datasets which does not contain a particular record from the original dataset. This set is called out-of-bag examples. There are n such subsets (one for each data record in original dataset T). OOB classifier is the aggregation of all such records.
-
-Out-of-bag estimate for the generalization error is the error rate of the outof-bag classifier on the training set (compare it with known yi’s).
-
-Out-of-bag (OOB) error, also called out-of-bag estimate, is a method of measuring the prediction error of random forests, boosted decision trees, and other machine learning models utilizing bootstrap aggregating to subsample data samples used for training.
-
-Out-of-bag estimates help in avoiding the need for an independent validation dataset. source: https://rstudio-pubs-static.s3.amazonaws.com/380073_87c1e18284bc449c9a7877570c8118fb.html 
-
-## Hierarchical clustering and heatmap with correlation
-```{r}
-#
-data <- assay(feature_selected_data.norm)
-colnames(data) <- classes2
-
-set.seed(8)
-idx <- sample(1:nrow(data), 36)
-data <- data[idx, ]
-
-# Hierarchical clustering - columns
-distC <- dist(t(data), method = "euclidean")
-as.matrix(distC)[1:7,1:7]
-
-treeC <- hclust(d=distC, method = "ward.D")
-dendroC <- as.dendrogram(treeC)
-plot(dendroC, main="Clustering of samples")
+Code inspired by Gillard, Grønvold & Mähler (2020)
+```{r, results='hide',message=FALSE, warning=FALSE}
+counter <- 0
+data <- t(assay(feature_selected_data.norm))
+accuracies <- NULL
 
 
-dendroC <- reorder(dendroC, 1:ncol(data), agglo.FUN = mean)
-plot(dendroC, main="Clustering of samples")
+# Run until counter is 1000...
+while (counter < 1000) {
+  holdout <- sample(1:150, 90)
+  rf.model <- randomForest(x = data[-holdout,-5], 
+                         y = feature_selected_data.norm$classes2[-holdout], 
+                         mtry = 2, ntree = 600, 
+                         proximity = TRUE)
+  
+  y_predicted<-predict(rf.model, data[holdout,-5])
+  df1<-data.frame(Orig=feature_selected_data.norm$classes2[holdout], 
+                Pred=y_predicted)
+  confusion <- table(df1$Orig, df1$Pred)
+  # Calculate current accuracy, and add to the list of accuracies
+  accuracies <- c(accuracies, sum(diag(confusion)) / sum(confusion)) 
+  counter = counter+1
+}
 
-
-# Scale rows
-d.scaled <- t(scale(t(data), center = TRUE, scale = TRUE))
-
-# Hierarchical clustering - genes
-distR <- as.dist(1-cor(t(d.scaled), method = "pearson"))
-treeR <- hclust(d=distR, method = "ward.D")
-dendroR <- as.dendrogram(treeR)
-
-
-library("gplots")
-
-colours <- colorRampPalette(c("Red", "Blue"))(2)[classes2]
-heatmap.2(x = as.matrix(data), 
-          Colv = dendroC,
-          Rowv = dendroR,
-          scale = "row",
-          trace = "none",
-          col = colorRampPalette(c("blue","white","red")),
-          cexCol = 0.8,
-          srtCol = 45,
-          labRow = rep("", nrow(data)), 
-          margins = c(4,3),
-          ColSideColors = colours
-)
-
-legend("left",      
-    legend = unique(classes2),
-    col = c("Red", "Blue"), 
-    lty= 1,             
-    lwd = 5,           
-    cex=.7
-    )
-
+# Calculate the mean accuracy from the 10 tests
+mean_accuracy <- mean(accuracies)
+mean_accuracy
 ```
+
+
+
+
+
+
