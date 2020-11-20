@@ -79,7 +79,7 @@ The KNN test shows that a K of 37 neighbours prooved to yield a highest accuracy
 
 ![KNN-test](Pictures/KNN.cv.png) 
 
-After running KNN without cross validation the initial observation from PCA plot is again observed. It appears to be difficult to separate rectum and colon data, whereas the other data is easier to separate. Without cross validation the accuracy was calculated to be 0.57, whereas with it was at 0.655. Which indicates that a linear model is not fitted for this dataset. Continuing with rectum vs colon cancer in comparisment, after cross validation the accuracy has decreased somewhat, but it is still difficult to separate rectum and colon.
+After running KNN without cross validation the initial observation from PCA plot is again observed. It appears to be difficult to separate rectum and colon data, whereas the other data is easier to separate. Without cross validation the accuracy was calculated to be 0.58, whereas with it was at 0.48. Which indicates that a linear model is not fitted for this dataset. Continuing with rectum vs colon cancer in comparisment, after cross validation the accuracy has decreased somewhat, but it is still difficult to separate rectum and colon.
 
 ### Support vector machine
 
@@ -291,29 +291,59 @@ feature_selected_data.norm <- varianceStabilizingTransformation(feature_selected
 Code retrieved from Gillard, Grønvold & Mähler (2020)
 ```{r, results='hide',message=FALSE, warning=FALSE}
 suppressPackageStartupMessages(library(class))
+suppressPackageStartupMessages(library(tidyverse))
 
-n <- nrow(t(assay(feature_selected_data.norm))) # Selects rows of transformed expr.norm (containing samples)
-selected.rows <- split(sample(n), rep(c("train","test"), length = n)) # Splits rows randomly into test and training
 
 expr <- t(assay(feature_selected_data.norm))
 rownames(expr) <- classes2
 
-expr.classes <- rownames(t(assay(feature_selected_data.norm))) # Retrieves sample names for saving
+set.seed(590)
+test <- (assay(dds2))
+colnames(test) <- classes2
+random.test <- test[sample(nrow(test), 36), ]
+row.random.test <- rownames(random.test)
 
-expr.unlabelled <- t(assay(feature_selected_data.norm)) # Fetches data and labels samples as null 
-rownames(expr.unlabelled)<- NULL
 
-expr.train <- expr.unlabelled[selected.rows$train,] #Makes training data
-expr.test <- expr.unlabelled[selected.rows$test, ] # makes testdata
+Trclasses <- classes2 # Retrieves sample names for saving
+Teclasses <- colnames(random.test)
+
+classlabel <- c(classes2, colnames(random.test))
+
+
+expr.unlabelled_training <- t(assay(feature_selected_data.norm)) # Fetches data and labels samples as null 
+expr.unlabelled_test <- (assay(dds2))
+
+colnames(expr.unlabelled_test) <- NULL
+rownames(expr.unlabelled_training)<- NULL
+
+# get 36 random rows
+
+
+expr.train <- expr.unlabelled_training #Makes training data
+expr.test <- subset(expr.unlabelled_test[, ], rownames(expr.unlabelled_test) %in% row.random.test)
+
+expr.test <- t(expr.test)
+expr.unlabelled_test <- t(expr.unlabelled_test)
+
+expr.unlabelled <- cbind(expr.unlabelled_training, expr.unlabelled_test)
+
+
+
+
+
+
+classlabel <-  str_replace_all(c("1" = "Colon", "2" = "Rectum"))
+
+
 ```
 
 ### Appendix 5 KNN 
 Code retrieved from Gillard, Grønvold & Mähler (2020)
 ```{r, results='hide',message=FALSE, warning=FALSE}
 
-expr.knn <- knn(expr.train, expr.test, classes2[selected.rows$train], k = 36) # Runs KNN with 4 neighbors
+expr.knn <- knn(expr.train, expr.test, classes2, k = 36) # Runs KNN with 4 neighbors
 
-confusion <- table(classes2[selected.rows$test], expr.knn, dnn = c("Real", "Predicted")) # Creates matrix table
+confusion <- table(Teclasses, expr.knn, dnn = c("Real", "Predicted")) # Creates matrix table
 
 # Measure accuracy of method
 accuracy <- sum(diag(confusion))/ sum(confusion)
@@ -472,7 +502,7 @@ suppressPackageStartupMessages(library(randomForest))
 suppressPackageStartupMessages(library(caret))
 
 data.rf1 <- randomForest(x = data[-holdout,-5], 
-                         y = feature_selected_data.norm$classes2[-holdout], 
+                         y = classes2[-holdout], 
                          mtry = 2, ntree = 600, 
                          proximity = TRUE)
 rf
@@ -482,8 +512,8 @@ rf
 varImpPlot(data.rf1)
 
 # Predict outcome for test set
-y_predicted<-predict(data.rf1, data[holdout,-5])
-df1<-data.frame(Orig=feature_selected_data.norm$classes2[holdout], 
+y_predicted<-predict(data.rf1, expr.test)
+df1<-data.frame(Orig=classes2[holdout], 
                 Pred=y_predicted)
 
 #Confusion matrix for test
@@ -525,8 +555,8 @@ while (counter < 1000) {
                          mtry = 2, ntree = 600, 
                          proximity = TRUE)
   
-  y_predicted<-predict(rf.model, data[holdout,-5])
-  df1<-data.frame(Orig=feature_selected_data.norm$classes2[holdout], 
+  y_predicted<-predict(rf.model, expr.test[holdout,-5])
+  df1<-data.frame(Orig=classes2[holdout], 
                 Pred=y_predicted)
   confusion <- table(df1$Orig, df1$Pred)
   # Calculate current accuracy, and add to the list of accuracies
