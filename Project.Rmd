@@ -323,6 +323,7 @@ expr.train <- expr.unlabelled_training #Makes training data
 expr.test <- subset(expr.unlabelled_test[, ], rownames(expr.unlabelled_test) %in% row.random.test)
 
 expr.test <- t(expr.test)
+
 expr.unlabelled_test <- t(expr.unlabelled_test)
 
 expr.unlabelled <- cbind(expr.unlabelled_training, expr.unlabelled_test)
